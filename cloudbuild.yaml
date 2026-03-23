@@ -1,27 +1,33 @@
 steps:
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-f', '${_DOCKERFILE}', '-t', 'gcr.io/$PROJECT_ID/pare:$COMMIT_SHA', '.']
+  - id: build
+    name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-f'
+      - '${_DOCKERFILE}'
+      - '-t'
+      - '${_REGISTRY}/$PROJECT_ID/${_SERVICE}:$COMMIT_SHA'
+      - '.'
 
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/pare:$COMMIT_SHA']
+  - id: push
+    name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '${_REGISTRY}/$PROJECT_ID/${_SERVICE}:$COMMIT_SHA'
 
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  - id: deploy
+    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
       - 'run'
       - 'deploy'
-      - 'pare'
-      - '--image=gcr.io/$PROJECT_ID/pare:$COMMIT_SHA'
-      - '--region=us-central1'
+      - '${_SERVICE}'
+      - '--image=${_REGISTRY}/$PROJECT_ID/${_SERVICE}:$COMMIT_SHA'
+      - '--region=${_REGION}'
       - '--platform=managed'
-      - '--memory=2Gi'
-      - '--cpu=4'
-      - '--min-instances=1'
-      - '--max-instances=32'
-      - '--timeout=300'
-      - '--concurrency=80'
-      - '--set-env-vars=WORKERS=4,LOG_LEVEL=ERROR'
-      - '--set-secrets=API_KEY=pare-api-key:latest,REDIS_URL=pare-redis-url:latest'
 
 substitutions:
   _DOCKERFILE: 'Dockerfile'
+  _SERVICE: 'pare'
+  _REGISTRY: 'gcr.io'
+  _REGION: 'us-central1'
