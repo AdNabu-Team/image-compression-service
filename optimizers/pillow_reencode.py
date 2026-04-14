@@ -86,6 +86,10 @@ class PillowReencodeOptimizer(BaseOptimizer):
         # The strip path (lossless re-encode) is almost always better at high quality.
         skip_reencode = config.quality >= 70 and config.strip_metadata
 
+        # No methods would run — return original immediately
+        if skip_reencode and not config.strip_metadata:
+            return self._build_result(data, data, "none")
+
         if use_parallel:
             results, method_names = await self._optimize_parallel(img, data, config, skip_reencode)
         else:

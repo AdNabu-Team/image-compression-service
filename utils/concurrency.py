@@ -92,7 +92,7 @@ class CompressionGate:
     def release(self, estimated_memory: int = 0):
         """Release a compression slot."""
         self._semaphore.release()
-        self._queue_depth -= 1
+        self._queue_depth = max(0, self._queue_depth - 1)
         self._memory_used = max(0, self._memory_used - estimated_memory)
 
     @property
