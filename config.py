@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # --- Concurrency ---
     compression_semaphore_size: int = 0  # 0 = use CPU count
     max_queue_depth: int = 0  # 0 = 2 * CPU count
+    estimate_semaphore_size: int = 0  # 0 = 2 * compression_semaphore_size
+    estimate_queue_depth: int = 0  # 0 = 2 * estimate_semaphore_size
+    memory_budget_mb: int = 6144  # Memory budget for concurrent compressions (MB)
 
     # --- Security ---
     redis_url: str = ""
@@ -56,6 +59,10 @@ class Settings(BaseSettings):
             self.compression_semaphore_size = os.cpu_count() or 4
         if self.max_queue_depth == 0:
             self.max_queue_depth = 2 * self.compression_semaphore_size
+        if self.estimate_semaphore_size == 0:
+            self.estimate_semaphore_size = 2 * self.compression_semaphore_size
+        if self.estimate_queue_depth == 0:
+            self.estimate_queue_depth = 2 * self.estimate_semaphore_size
         Image.MAX_IMAGE_PIXELS = self.max_image_pixels
 
 
