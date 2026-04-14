@@ -40,13 +40,17 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
 
         except _PIL_Image.DecompressionBombError:
-            max_mp = settings.max_image_pixels // 1_000_000
+            limit = settings.max_image_pixels
+            if limit >= 1_000_000:
+                limit_str = f"{limit // 1_000_000} megapixels"
+            else:
+                limit_str = f"{limit:,} pixels"
             response = JSONResponse(
                 status_code=413,
                 content={
                     "success": False,
                     "error": "image_too_large",
-                    "message": f"Image exceeds maximum pixel count ({max_mp} megapixels)",
+                    "message": f"Image exceeds maximum pixel count ({limit_str})",
                 },
             )
 

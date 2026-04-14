@@ -64,6 +64,10 @@ class CompressionGate:
                     "Compression queue full. Try again shortly.",
                     retry_after=5,
                 )
+            # Intentional: `self._memory_used > 0` ensures the first request is always
+            # admitted even if its estimate exceeds the budget. Without this, a single
+            # large file could never be processed if its estimate > budget. The budget
+            # protects against concurrent accumulation, not single-request size.
             if (
                 estimated_memory > 0
                 and self._memory_used > 0
@@ -76,7 +80,14 @@ class CompressionGate:
             self._queue_depth += 1
             self._memory_used += estimated_memory
 
-        await self._semaphore.acquire()
+        try:
+            await self._semaphore.acquire()
+        except BaseException:
+            # Roll back tracking if semaphore acquire is cancelled (e.g., client disconnect)
+            async with self._lock:
+                self._queue_depth = max(0, self._queue_depth - 1)
+                self._memory_used = max(0, self._memory_used - estimated_memory)
+            raise
 
     def release(self, estimated_memory: int = 0):
         """Release a compression slot."""

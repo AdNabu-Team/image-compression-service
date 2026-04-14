@@ -111,19 +111,21 @@ class TestDecompressedSizeValidation:
 
     def test_huge_dimensions_rejected(self):
         """Images with decompressed size > 512MB are rejected."""
-        # Create a minimal JPEG with huge claimed dimensions via mock
         img = Image.new("RGB", (100, 100))
         buf = io.BytesIO()
         img.save(buf, format="BMP")
         data = buf.getvalue()
 
-        # Patch Image.open to return a mock with huge dimensions
-        with patch("utils.image_validation.Image.open") as mock_open:
-            mock_img = mock_open.return_value
-            mock_img.size = (20000, 20000)  # 400MP * 3 bpp = 1.2GB > 512MB
-            mock_img.mode = "RGB"
-            mock_img.n_frames = 1
+        from unittest.mock import MagicMock
 
+        mock_img = MagicMock()
+        mock_img.size = (20000, 20000)  # 400MP * 3 bpp = 1.2GB > 512MB
+        mock_img.mode = "RGB"
+        mock_img.n_frames = 1
+        mock_img.__enter__ = lambda self: self
+        mock_img.__exit__ = MagicMock(return_value=False)
+
+        with patch("utils.image_validation.Image.open", return_value=mock_img):
             with pytest.raises(ImageTooLargeError) as exc_info:
                 validate_image_dimensions(data)
             assert exc_info.value.status_code == 413
@@ -135,12 +137,16 @@ class TestDecompressedSizeValidation:
         img.save(buf, format="BMP")
         data = buf.getvalue()
 
-        with patch("utils.image_validation.Image.open") as mock_open:
-            mock_img = mock_open.return_value
-            mock_img.size = (100, 100)
-            mock_img.mode = "RGB"
-            mock_img.n_frames = 600
+        from unittest.mock import MagicMock
 
+        mock_img = MagicMock()
+        mock_img.size = (100, 100)
+        mock_img.mode = "RGB"
+        mock_img.n_frames = 600
+        mock_img.__enter__ = lambda self: self
+        mock_img.__exit__ = MagicMock(return_value=False)
+
+        with patch("utils.image_validation.Image.open", return_value=mock_img):
             with pytest.raises(ImageTooLargeError, match="frames"):
                 validate_image_dimensions(data)
 
@@ -157,12 +163,16 @@ class TestDecompressedSizeValidation:
         img.save(buf, format="BMP")
         data = buf.getvalue()
 
-        with patch("utils.image_validation.Image.open") as mock_open:
-            mock_img = mock_open.return_value
-            mock_img.size = (5000, 5000)  # 25MP * 3 = 75MB, under 512MB
-            mock_img.mode = "RGB"
-            mock_img.n_frames = 1
+        from unittest.mock import MagicMock
 
+        mock_img = MagicMock()
+        mock_img.size = (5000, 5000)  # 25MP * 3 = 75MB, under 512MB
+        mock_img.mode = "RGB"
+        mock_img.n_frames = 1
+        mock_img.__enter__ = lambda self: self
+        mock_img.__exit__ = MagicMock(return_value=False)
+
+        with patch("utils.image_validation.Image.open", return_value=mock_img):
             # Should not raise
             validate_image_dimensions(data)
 

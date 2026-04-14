@@ -79,6 +79,9 @@ class WebpOptimizer(BaseOptimizer):
     @staticmethod
     def _encode_webp(img: Image.Image, quality: int, is_animated: bool) -> bytes:
         """Encode a Pillow Image to WebP bytes."""
+        if is_animated:
+            img.seek(0)  # Reset frame pointer before re-encode
+
         output = io.BytesIO()
 
         save_kwargs = {

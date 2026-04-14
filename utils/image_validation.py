@@ -42,15 +42,19 @@ def validate_image_dimensions(data: bytes) -> None:
 
     SVG/SVGZ files are text-based and fail Image.open() — the except handler
     lets them through since they don't decompress to pixel data.
+    DecompressionBombError is re-raised as ImageTooLargeError (not swallowed).
     """
     try:
-        img = Image.open(io.BytesIO(data))
+        with Image.open(io.BytesIO(data)) as img:
+            width, height = img.size
+            bpp = _BPP.get(img.mode, 4)  # Default to 4 (RGBA) if unknown mode
+            n_frames = getattr(img, "n_frames", 1)
+    except Image.DecompressionBombError:
+        raise ImageTooLargeError(
+            "Image dimensions exceed maximum allowed pixel count",
+        )
     except Exception:
         return  # Not a raster image or invalid — let format detection handle it
-
-    width, height = img.size
-    bpp = _BPP.get(img.mode, 4)  # Default to 4 (RGBA) if unknown mode
-    n_frames = getattr(img, "n_frames", 1)
 
     if n_frames > MAX_FRAME_COUNT:
         raise ImageTooLargeError(
