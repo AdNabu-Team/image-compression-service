@@ -105,17 +105,29 @@ def test_measure_total_cpu_combines_parent_and_children():
 
 def test_measure_parallelism_above_one_when_subprocess_runs_concurrently():
     """If the parent and a subprocess both burn CPU at the same time,
-    parallelism should exceed 1.0."""
+    parallelism should exceed 1.0.
+
+    The subprocess writes a "ready" line to stdout *after* paying its
+    Python startup cost, then burns CPU. The parent blocks on that line
+    before starting its own busy loop, so the two CPU-burning windows
+    reliably overlap regardless of interpreter cold-start variance.
+    """
     busy_loop = (
-        "import time\n"
-        "end = time.perf_counter() + 0.10\n"
+        "import sys, time\n"
+        "sys.stdout.write('ready\\n')\n"
+        "sys.stdout.flush()\n"
+        "end = time.perf_counter() + 0.20\n"
         "x = 0\n"
         "while time.perf_counter() < end:\n"
         "    x += 1\n"
     )
     with measure() as m:
-        proc = subprocess.Popen([sys.executable, "-c", busy_loop])
-        end = time.perf_counter() + 0.10
+        proc = subprocess.Popen(
+            [sys.executable, "-c", busy_loop], stdout=subprocess.PIPE, text=True
+        )
+        assert proc.stdout is not None
+        proc.stdout.readline()  # block until subprocess is in its busy loop
+        end = time.perf_counter() + 0.20
         y = 0
         while time.perf_counter() < end:
             y += 1
