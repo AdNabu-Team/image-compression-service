@@ -21,6 +21,7 @@ from bench.corpus.cli import _load_manifest, _manifest_path
 from bench.runner.case import DEFAULT_PRESETS, load_cases
 from bench.runner.compare import compare, render_compare_markdown
 from bench.runner.modes.accuracy import run_accuracy_sync
+from bench.runner.modes.load import run_load_sync
 from bench.runner.modes.memory import run_memory_sync
 from bench.runner.modes.quality import run_quality_sync
 from bench.runner.modes.quick import run_quick_sync
@@ -68,10 +69,18 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     isolate = getattr(args, "isolate", False)
 
-    if isolate and args.mode != "timing":
+    if isolate and args.mode not in ("timing", "load"):
         print(
             f"warning: --isolate is only supported for --mode timing; "
             f"ignoring for mode={args.mode!r}",
+            file=sys.stderr,
+        )
+        isolate = False
+
+    if isolate and args.mode == "load":
+        print(
+            "warning: --isolate is incompatible with --mode load (load mode is intentionally "
+            "in-process to exercise the gate); ignoring --isolate",
             file=sys.stderr,
         )
         isolate = False
@@ -92,6 +101,22 @@ def cmd_run(args: argparse.Namespace) -> int:
             "metrics": ["ssim", "psnr", "ssimulacra2", "butteraugli"],
         }
         iterations = run_quality_sync(cases)
+    elif args.mode == "load":
+        config = {
+            "warmup": 0,
+            "repeat": 1,
+            "n_concurrent": args.n_concurrent,
+            "semaphore_size": args.semaphore_size,
+            "queue_depth": args.queue_depth,
+            "memory_budget_mb": args.memory_budget_mb,
+        }
+        iterations = run_load_sync(
+            cases,
+            n_concurrent=args.n_concurrent,
+            semaphore_size=args.semaphore_size,
+            queue_depth=args.queue_depth,
+            memory_budget_mb=args.memory_budget_mb,
+        )
     else:  # timing
         config = {
             "warmup": args.warmup,
@@ -175,7 +200,9 @@ def build_parser() -> argparse.ArgumentParser:
     # without an explicit `run` subcommand.
     p_run = sub.add_parser("run", help="execute a benchmark run")
     p_run.add_argument(
-        "--mode", choices=("quick", "timing", "memory", "accuracy", "quality"), default="timing"
+        "--mode",
+        choices=("quick", "timing", "memory", "accuracy", "quality", "load"),
+        default="timing",
     )
     p_run.add_argument("--manifest", default="core")
     p_run.add_argument("--corpus", default=str(DEFAULT_CORPUS_ROOT))
@@ -202,6 +229,31 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     p_run.add_argument("--annotate", action="append", default=None)
+    # Load-mode flags (silently ignored for other modes).
+    p_run.add_argument(
+        "--n-concurrent",
+        type=int,
+        default=30,
+        help="(load mode) number of concurrent optimize_image() calls per case",
+    )
+    p_run.add_argument(
+        "--semaphore-size",
+        type=int,
+        default=8,
+        help="(load mode) CompressionGate semaphore size (mirrors settings.compression_semaphore_size)",
+    )
+    p_run.add_argument(
+        "--queue-depth",
+        type=int,
+        default=16,
+        help="(load mode) CompressionGate max queue depth (mirrors settings.max_queue_depth)",
+    )
+    p_run.add_argument(
+        "--memory-budget-mb",
+        type=int,
+        default=0,
+        help="(load mode) CompressionGate memory budget in MB (0 = use settings default)",
+    )
     p_run.set_defaults(func=cmd_run)
 
     p_cmp = sub.add_parser("compare", help="diff two runs with significance tests")

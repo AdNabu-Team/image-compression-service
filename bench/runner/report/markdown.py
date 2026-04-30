@@ -133,6 +133,10 @@ def render_run(run: dict[str, Any]) -> str:
         out.append("")
         out.append(_render_quality_summary(run["iterations"]))
 
+    if run["mode"] == "load":
+        out.append("")
+        out.append(_render_load_summary(run))
+
     return "\n".join(out)
 
 
@@ -418,6 +422,106 @@ def _render_quality_summary(iterations: list[dict[str, Any]]) -> str:
             med = percentile(vals, 50)
             p95v = percentile(vals, 95)
             lines.append(f"| {fmt} | {len(vals)} | {med:.4f} | {p95v:.4f} |")
+
+    return "\n".join(lines)
+
+
+def _render_load_summary(run: dict[str, Any]) -> str:
+    """Render an aggregate load-summary section for load-mode runs.
+
+    Summarises across all cases:
+    - Total requests, 503s, errors and overall ok_rate
+    - Median throughput and p95 request latency
+    - Gate configuration that produced the numbers
+    - Per-format breakdown (median throughput and 503 rate)
+
+    Only called when ``run['mode'] == 'load'``.
+    """
+    iterations = run.get("iterations", [])
+    cfg = run.get("config", {})
+
+    # Collect per-case load blocks from successful (non-failure) rows.
+    total_requests = 0
+    total_success = 0
+    total_503 = 0
+    total_error = 0
+    throughputs: list[float] = []
+    latency_p95s: list[float] = []
+    by_fmt: dict[str, dict[str, list[float]]] = {}
+
+    for it in iterations:
+        if _is_failure(it):
+            continue
+        lb = it.get("load")
+        if not isinstance(lb, dict):
+            continue
+        n_con = lb.get("n_concurrent", 0)
+        n_ok = lb.get("n_success", 0)
+        n_503 = lb.get("n_503", 0)
+        n_err = lb.get("n_error", 0)
+        total_requests += n_con
+        total_success += n_ok
+        total_503 += n_503
+        total_error += n_err
+
+        tp = lb.get("throughput_per_sec", 0.0)
+        throughputs.append(tp)
+
+        lat_block = lb.get("request_latency_ms", {})
+        p95 = lat_block.get("p95", 0.0)
+        latency_p95s.append(p95)
+
+        fmt = it.get("format", "?")
+        by_fmt.setdefault(fmt, {"throughputs": [], "ok_rates": []})
+        by_fmt[fmt]["throughputs"].append(tp)
+        ok_rate = lb.get("ok_rate", 0.0)
+        by_fmt[fmt]["ok_rates"].append(ok_rate)
+
+    if total_requests == 0:
+        return "## Load summary\n\n_No load data available._"
+
+    overall_ok_rate = total_success / total_requests if total_requests > 0 else 0.0
+    med_throughput = percentile(throughputs, 50) if throughputs else 0.0
+    med_lat_p95 = percentile(latency_p95s, 50) if latency_p95s else 0.0
+
+    sem_size = cfg.get("semaphore_size", "?")
+    queue_depth = cfg.get("queue_depth", "?")
+    n_concurrent = cfg.get("n_concurrent", "?")
+
+    lines: list[str] = []
+    lines.append("## Load summary")
+    lines.append("")
+    lines.append(
+        f"_Gate config: `semaphore_size={sem_size}`, `queue_depth={queue_depth}`, "
+        f"`n_concurrent={n_concurrent}` per case._"
+    )
+    lines.append("")
+
+    # Aggregate totals table
+    lines.append("### Aggregate totals")
+    lines.append("")
+    lines.append("| metric | value |")
+    lines.append("|---|---|")
+    lines.append(f"| total requests | {total_requests} |")
+    lines.append(f"| successful | {total_success} ({overall_ok_rate:.1%}) |")
+    lines.append(f"| 503 (backpressure) | {total_503} |")
+    lines.append(f"| other errors | {total_error} |")
+    lines.append(f"| median throughput | {med_throughput:.1f} req/s |")
+    lines.append(f"| median p95 latency | {_fmt_ms(med_lat_p95)} |")
+    lines.append("")
+
+    # Per-format breakdown
+    if by_fmt:
+        lines.append("### Per-format breakdown")
+        lines.append("")
+        lines.append("| format | cases | median throughput | median ok_rate |")
+        lines.append("|---|---|---|---|")
+        for fmt in sorted(by_fmt.keys()):
+            tps = by_fmt[fmt]["throughputs"]
+            ors = by_fmt[fmt]["ok_rates"]
+            med_tp = percentile(tps, 50) if tps else 0.0
+            med_or = percentile(ors, 50) if ors else 0.0
+            lines.append(f"| {fmt} | {len(tps)} | {med_tp:.1f} req/s | {med_or:.1%} |")
 
     return "\n".join(lines)
 
