@@ -51,7 +51,7 @@ jobs:
 
       - name: Build corpus + run quick mode in container
         run: |
-          mkdir -p reports
+          mkdir -p reports tests/corpus bench/corpus/cache
           docker run --rm -v "$(pwd):/work" -w /work \
             pare:baseline-${{ github.run_id }} \
             bash -c "pip install --no-cache-dir -r requirements-bench.txt && \
@@ -61,6 +61,7 @@ jobs:
                        --annotate kind=baseline-candidate \
                        --annotate sha=${{ github.sha }} \
                        --out reports/_candidate.json"
+          sudo chown -R "$(id -u):$(id -g)" reports tests/corpus bench/corpus/cache
 
       - name: Compare candidate against current baseline
         id: compare

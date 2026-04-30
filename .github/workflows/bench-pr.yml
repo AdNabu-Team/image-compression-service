@@ -47,9 +47,12 @@ jobs:
       - name: Build corpus + run quick mode in container
         # Bench-only deps (numpy, psutil) live in requirements-bench.txt and
         # are deliberately NOT in the production image. Install at runtime so
-        # the production image stays lean.
+        # the production image stays lean. Fix permissions afterwards because
+        # Docker writes as root by default; subsequent steps (upload-artifact,
+        # `gh pr edit`-style git ops) run as the runner user and can't touch
+        # root-owned files in the workspace.
         run: |
-          mkdir -p reports
+          mkdir -p reports tests/corpus bench/corpus/cache
           docker run --rm \
             -v "$(pwd):/work" \
             -w /work \
@@ -60,6 +63,7 @@ jobs:
                        --annotate ci=github \
                        --annotate pr=${{ github.event.pull_request.number }} \
                        --out reports/_head.json"
+          sudo chown -R "$(id -u):$(id -g)" reports tests/corpus bench/corpus/cache
 
       - name: Compare against baseline (or seed if missing)
         id: compare
