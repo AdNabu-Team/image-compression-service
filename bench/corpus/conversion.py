@@ -81,7 +81,11 @@ def _register_optional_plugins() -> None:
         _JXL_AVAILABLE = True
     except ImportError:
         try:
-            import jxlpy  # noqa: F401
+            # `import jxlpy` alone does NOT register the Pillow save/load
+            # handler — that lives in jxlpy.JXLImagePlugin. Importing the
+            # plugin module is what makes `Image.save(buf, format="JXL")`
+            # work.
+            from jxlpy import JXLImagePlugin  # noqa: F401
 
             _JXL_AVAILABLE = True
         except ImportError:

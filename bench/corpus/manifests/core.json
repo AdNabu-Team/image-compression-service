@@ -4,7 +4,8 @@
   "library_versions": {
     "Pillow": "10.4.0",
     "numpy": "2.4.4",
-    "pillow_heif": "0.22.0"
+    "pillow_heif": "0.22.0",
+    "jxlpy": "0.9.5"
   },
   "entries": [
     {
@@ -713,6 +714,84 @@
         "animated"
       ],
       "expected_pixel_sha256": "05137f483db8038caddf6d70636aef770df4be86c2c9290a74aeb131e3d4757f"
+    },
+    {
+      "name": "photo_perlin_tiny_jxl",
+      "bucket": "tiny",
+      "content_kind": "photo_perlin",
+      "seed": 50,
+      "width": 64,
+      "height": 64,
+      "output_formats": [
+        "jxl"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "9f891fbbafa64e07b6c84c806c5918737d564e481e35020023bb03eef9a8a711"
+    },
+    {
+      "name": "photo_perlin_small_jxl",
+      "bucket": "small",
+      "content_kind": "photo_perlin",
+      "seed": 51,
+      "width": 1024,
+      "height": 768,
+      "output_formats": [
+        "jxl"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "fa47a78f3301f1d8b195671239256a37d133d2170eaa7c15a41b708a5a43201b"
+    },
+    {
+      "name": "photo_noise_medium_jxl",
+      "bucket": "medium",
+      "content_kind": "photo_noise",
+      "seed": 52,
+      "width": 512,
+      "height": 384,
+      "output_formats": [
+        "jxl"
+      ],
+      "tags": [
+        "photo",
+        "worst_case"
+      ],
+      "expected_pixel_sha256": "074f1f29884c01e011ff083244f34864dfef460b73f5e4f0f7b1aa9d7d3262e5"
+    },
+    {
+      "name": "photo_noise_large_jxl",
+      "bucket": "large",
+      "content_kind": "photo_noise",
+      "seed": 53,
+      "width": 2400,
+      "height": 1800,
+      "output_formats": [
+        "jxl"
+      ],
+      "tags": [
+        "photo",
+        "worst_case"
+      ],
+      "expected_pixel_sha256": "3d5b6418b3a84fc5b6d0ceafa2053a7388a979521be572b14c9eed8a9b5a7cc8"
+    },
+    {
+      "name": "photo_noise_xlarge_jxl",
+      "bucket": "xlarge",
+      "content_kind": "photo_noise",
+      "seed": 54,
+      "width": 4000,
+      "height": 3000,
+      "output_formats": [
+        "jxl"
+      ],
+      "tags": [
+        "photo",
+        "worst_case"
+      ],
+      "expected_pixel_sha256": "be992cc28c17a53bfcf0d546abe25e41514b0c9403100fca7f1fbddf634e8fa4"
     }
   ]
 }
