@@ -65,12 +65,15 @@ jobs:
 
       - name: Compare candidate against current baseline
         id: compare
+        # Fresh container needs bench deps reinstalled (numpy/psutil are not
+        # in the production image). See bench-pr.yml for the same pattern.
         run: |
           set +e
           docker run --rm -v "$(pwd):/work" -w /work \
             pare:baseline-${{ github.run_id }} \
-            python -m bench.compare reports/baseline.core.json reports/_candidate.json \
-              --threshold-pct 10 --format markdown > /tmp/compare.md
+            bash -c "pip install --no-cache-dir -q -r requirements-bench.txt && \
+                     python -m bench.compare reports/baseline.core.json reports/_candidate.json \
+                       --threshold-pct 10 --format markdown" > /tmp/compare.md
           ec=$?
           set -e
           echo "exit=${ec}" >> "$GITHUB_OUTPUT"

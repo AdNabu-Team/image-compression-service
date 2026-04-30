@@ -67,6 +67,9 @@ jobs:
 
       - name: Compare against baseline (or seed if missing)
         id: compare
+        # Each docker run --rm creates a fresh container, so the runtime
+        # pip install from the bench step is gone. Reinstall bench deps
+        # before running the compare/report module here too.
         run: |
           if [ ! -f reports/baseline.core.json ]; then
             echo "no-baseline=true" >> "$GITHUB_OUTPUT"
@@ -75,7 +78,8 @@ jobs:
               -v "$(pwd):/work" \
               -w /work \
               pare:pr-${{ github.run_id }} \
-              python -m bench.run report reports/_head.json --format markdown \
+              bash -c "pip install --no-cache-dir -q -r requirements-bench.txt && \
+                       python -m bench.run report reports/_head.json --format markdown" \
               >> /tmp/compare.md
           else
             echo "no-baseline=false" >> "$GITHUB_OUTPUT"
@@ -84,8 +88,9 @@ jobs:
               -v "$(pwd):/work" \
               -w /work \
               pare:pr-${{ github.run_id }} \
-              python -m bench.compare reports/baseline.core.json reports/_head.json \
-                --threshold-pct 10 --format markdown \
+              bash -c "pip install --no-cache-dir -q -r requirements-bench.txt && \
+                       python -m bench.compare reports/baseline.core.json reports/_head.json \
+                         --threshold-pct 10 --format markdown" \
               > /tmp/compare.md
             echo "compare-exit=$?" >> "$GITHUB_OUTPUT"
             set -e
