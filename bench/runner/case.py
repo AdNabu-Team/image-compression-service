@@ -58,7 +58,8 @@ def _make_case(
     if not path.exists():
         raise CorpusFileMissing(
             f"corpus file missing: {path}. "
-            f"Run `python -m bench.corpus build --manifest {corpus_root.parent.name or 'core'}`."
+            f"Run `python -m bench.corpus build` against the matching --manifest "
+            f"(e.g. `--manifest core` or `--manifest full`)."
         )
     return Case(
         case_id=f"{entry.name}.{fmt}@{preset}",

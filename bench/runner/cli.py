@@ -1,13 +1,20 @@
 """Command-line interface for `bench.run` and `bench.compare`.
 
-    python -m bench.run [--mode quick|timing|memory|accuracy|quality] [--manifest core] \\
-                        [--out reports/x.json] [--corpus PATH] \\
+    python -m bench.run [--mode quick|timing|memory|accuracy|quality|load] \\
+                        [--manifest core] [--out reports/x.json] [--corpus PATH] \\
                         [--bucket B] [--fmt F] [--tag T] [--preset P] \\
                         [--repeat N] [--warmup N] [--seed N] [--no-shuffle] \\
-                        [--annotate KEY=VAL ...]
+                        [--isolate] [--quality-fast] \\
+                        [--n-concurrent N] [--semaphore-size N] [--queue-depth N] \\
+                        [--memory-budget-mb N] [--annotate KEY=VAL ...]
 
     python -m bench.compare A.json B.json [--threshold-pct N] [--alpha A]
-    python -m bench.report RUN.json [--format markdown|json]
+    python -m bench.run report RUN.json [--format markdown|json]
+
+Exit codes for `compare`:
+    0  no significant regression
+    1  regression flagged in at least one case
+    2  schema error (mismatched schema_version, missing required fields)
 """
 
 from __future__ import annotations
@@ -164,12 +171,19 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 
 def cmd_compare(args: argparse.Namespace) -> int:
-    result = compare(
-        Path(args.baseline),
-        Path(args.head),
-        threshold_pct=args.threshold_pct,
-        alpha=args.alpha,
-    )
+    try:
+        result = compare(
+            Path(args.baseline),
+            Path(args.head),
+            threshold_pct=args.threshold_pct,
+            alpha=args.alpha,
+        )
+    except (ValueError, KeyError) as e:
+        # ValueError comes from load_run on schema_version mismatch;
+        # KeyError catches missing required fields. Both map to
+        # docstring exit code 2 ("schema error").
+        print(f"compare: schema error: {e}", file=sys.stderr)
+        return 2
     if args.format == "markdown":
         print(render_compare_markdown(result))
     else:

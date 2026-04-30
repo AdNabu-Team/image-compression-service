@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from bench.runner.compare import compare, render_compare_markdown
@@ -212,3 +213,14 @@ def test_compare_handles_empty_iterations(tmp_path: Path):
 def test_runmetadata_default_timestamp_is_iso():
     md = RunMetadata(mode="timing", config={})
     assert "T" in md.timestamp  # ISO-8601 has T separator
+
+
+def test_cmd_compare_returns_exit_code_2_on_schema_error(tmp_path: Path):
+    """compare CLI maps load_run's ValueError (e.g. schema_version mismatch)
+    to docstring exit code 2 — not an unhandled traceback."""
+    from bench.runner.cli import main
+
+    bad = tmp_path / "bad.json"
+    bad.write_text(json.dumps({"schema_version": 999, "iterations": []}))
+    rc = main(["compare", str(bad), str(bad), "--threshold-pct", "10"])
+    assert rc == 2

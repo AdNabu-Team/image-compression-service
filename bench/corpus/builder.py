@@ -2,8 +2,12 @@
 
 The builder walks a manifest, synthesizes each entry, encodes into every
 declared `output_format`, and writes the result with an atomic rename.
-Files match the manifest's pixel-hash already on disk are skipped, so
-incremental rebuilds are cheap; `--force` re-synthesizes everything.
+Existence-based skip: if the target file already exists on disk and
+`--force` is not set, the entry's encode step is skipped — fast for
+incremental rebuilds, but does NOT validate that the on-disk bytes
+match the current manifest. Use `bench.corpus verify` (which re-runs
+the synthesizer and checks `expected_pixel_sha256`) to catch stale
+files; `--force` re-synthesizes and re-encodes everything.
 
 Bucket validation runs after every encode: if the encoded file lands
 outside the entry's declared bucket, the build fails with an actionable

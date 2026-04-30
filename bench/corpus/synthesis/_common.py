@@ -17,7 +17,12 @@ from typing import Callable
 import numpy as np
 from PIL import Image
 
-SynthFn = Callable[..., Image.Image]
+from bench.corpus.manifest import Synthesized
+
+# A synthesizer returns one of: a single PIL.Image (static), a list of
+# Image frames (animated), or a numpy.ndarray (deep-color uint16).
+# Mirrors `Synthesized` exactly — see `bench/corpus/manifest.py`.
+SynthFn = Callable[..., Synthesized]
 
 
 _REGISTRY: dict[str, SynthFn] = {}
