@@ -264,6 +264,7 @@ def reseal_manifest(
                 encoded_sha256=dict(entry.encoded_sha256),
                 source=entry.source,
                 expected_byte_sha256={"source": byte_sha},
+                bit_depth=entry.bit_depth,
             )
         else:
             if entry.source is not None:
@@ -284,6 +285,7 @@ def reseal_manifest(
                 encoded_sha256=dict(entry.encoded_sha256),
                 source=entry.source,
                 expected_byte_sha256=None,
+                bit_depth=entry.bit_depth,
             )
         sealed.entries.append(sealed_entry)
     return sealed

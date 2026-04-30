@@ -40,10 +40,25 @@ A new `expected_byte_sha256` field (`dict[str, str] | None`) was added to `Manif
 
 - **Raster entries**: Pixel-level SHA-256 of raw `Image.tobytes()` is canonical (field `expected_pixel_sha256`). Encoded SHA may be recorded as `encoded_sha256.<platform>` for diagnostics, but is never blocking.
 - **Vector entries** (SVG/SVGZ): Byte-level SHA-256 of the raw source bytes is canonical (field `expected_byte_sha256["source"]`). SVG sources are XML; no pixel data exists. Encoded bytes are deterministic across platforms (no SIMD variance), so a flat `{format: sha256}` mapping suffices.
+- **Deep-color entries** (10/12-bit): Pixel-level SHA-256 is computed from the raw `numpy.uint16` array bytes (dtype + shape are baked into the digest, so a 10-bit and a 16-bit array of the same logical pixels never collide). See `manifest.py:pixel_sha256()`.
 - `random.Random(seed)` instances only — never mutate the global PRNG.
 - Fonts vendored at `bench/corpus/fonts/` (Pillow's default font is build-dependent).
 - Fetched raster entries: pixel hash computed from decoded source image (same `pixel_sha256()` function). Source URL SHA-256 guards against corrupt downloads; pixel SHA-256 guards against CDN re-encoding.
 - Fetched vector entries (`fetched_vector` content_kind): source SHA-256 guards against corrupt downloads. The builder writes bytes directly to disk — no `Image.open()` is called.
+
+## Deep-color encoding (10/12-bit)
+
+`bench/corpus/synthesis/deep_color.py` produces `numpy.uint16` arrays with values in the raw bit-depth range: `[0, 1023]` for 10-bit, `[0, 4095]` for 12-bit. Bit depth is auto-detected from `max(array)` in `conversion._detect_bit_depth()`.
+
+**JXL** — natively supported via `jxlpy.JXLPyEncoder` typed buffers. Accepts uint16 pixel data directly and encodes with the correct bit depth in the output container. The decoder (`jxlpy.JXLPyDecoder`) round-trips `bits_per_sample` in the info dict.
+
+**HEIC/AVIF** — supported via `pillow_heif.from_bytes()` typed-buffer API (modes like `RGB;10`). Requires pillow_heif ≥ 0.22. Both succeed on pillow_heif 0.22.0 (tested). Raises `FormatNotSupportedError` with a descriptive message if the typed-buffer path fails.
+
+**All other formats** (PNG, JPEG, WebP, GIF, BMP, TIFF, APNG) — ndarray content raises `FormatNotSupportedError` because 8-bit codecs cannot represent 10/12-bit pixel values without quantizing. This is intentional and correct.
+
+**Manifest `bit_depth` field**: `ManifestEntry` has an optional `bit_depth: int | None` field (default `None` ≡ 8-bit). Deep-color entries set this to `10` or `12`. The field is omitted from JSON when `None`; present when set.
+
+**Deferred**: The production estimator's BPP curve fits in `estimation/estimator.py` assume 8-bit input; deep-color accuracy may be off until estimator updates land in a follow-up PR.
 
 ## Common commands
 

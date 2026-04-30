@@ -7,22 +7,22 @@ registered lazily so that missing optional dependencies (jxlpy, etc.)
 just skip the affected formats with a warning instead of breaking the
 whole build.
 
-Format coverage in v0/v1:
+Format coverage in v1:
 
-| Format | Static | Animated | Deep color | Notes                           |
-|--------|--------|----------|------------|---------------------------------|
-| PNG    |   ✓    |     —    |     —      |                                 |
-| APNG   |   —    |     ✓    |     —      |                                 |
-| JPEG   |   ✓    |     —    |     —      |                                 |
-| WEBP   |   ✓    |     ✓    |     —      |                                 |
-| GIF    |   ✓    |     ✓    |     —      |                                 |
-| BMP    |   ✓    |     —    |     —      |                                 |
-| TIFF   |   ✓    |     —    |     —      |                                 |
-| HEIC   |   ✓    |     —    |     —      |                                 |
-| AVIF   |   ✓    |     —    |     —      |                                 |
-| JXL    |   ✓*   |     —    |     —      | requires pillow_jxl / jxlpy     |
-| SVG    |   ✓†   |     —    |     —      | vector pass-through (bytes in)  |
-| SVGZ   |   ✓†   |     —    |     —      | gzip of SVG, mtime=0            |
+| Format | Static | Animated | Deep color | Notes                                |
+|--------|--------|----------|------------|--------------------------------------|
+| PNG    |   ✓    |     —    |     —      |                                      |
+| APNG   |   —    |     ✓    |     —      |                                      |
+| JPEG   |   ✓    |     —    |     —      |                                      |
+| WEBP   |   ✓    |     ✓    |     —      |                                      |
+| GIF    |   ✓    |     ✓    |     —      |                                      |
+| BMP    |   ✓    |     —    |     —      |                                      |
+| TIFF   |   ✓    |     —    |     —      |                                      |
+| HEIC   |   ✓    |     —    |     ✓      | typed-buffer via pillow_heif 0.22+   |
+| AVIF   |   ✓    |     —    |     ✓      | typed-buffer via pillow_heif 0.22+   |
+| JXL    |   ✓*   |     —    |     ✓      | native 10/12-bit via jxlpy encoder   |
+| SVG    |   ✓†   |     —    |     —      | vector pass-through (bytes in)       |
+| SVGZ   |   ✓†   |     —    |     —      | gzip of SVG, mtime=0                 |
 
 * JXL requires `pillow_jxl` or `jxlpy` to be installed.
 † SVG/SVGZ use vector pass-through: content must be raw bytes (not a PIL
@@ -30,8 +30,20 @@ Format coverage in v0/v1:
   `source` URL; the builder bypasses Image.open() for these entries.
   Determinism contract: byte-level SHA-256 of the source bytes
   (stored in `expected_byte_sha256["source"]` in the manifest).
-Deep-color encoding is deferred to v1 (jxlpy + pillow_heif typed
-buffers); manifests with deep-color entries skip those formats today.
+
+Deep-color encoding (10/12-bit):
+  - JXL: natively supported via `jxlpy.JXLPyEncoder` typed buffers.  Pass a
+    uint16 ndarray; bit depth is auto-detected from the array's max value
+    (max < 1024 → 10-bit, max < 4096 → 12-bit, else 16-bit).
+  - HEIC/AVIF: supported via `pillow_heif.from_bytes()` typed-buffer API
+    (pillow_heif ≥ 0.22).  Raises `FormatNotSupportedError` if the installed
+    version does not support the typed-buffer path.
+  - All other formats: ndarray content raises `FormatNotSupportedError` because
+    8-bit codecs cannot represent 10/12-bit pixel values without quantizing.
+
+Production estimator note:
+  BPP curve fits in `estimation/estimator.py` assume 8-bit input; deep-color
+  accuracy will be off until estimator updates land in a follow-up PR.
 """
 
 from __future__ import annotations
@@ -205,9 +217,110 @@ def _encode_apng(content: Synthesized) -> bytes:
     return buf.getvalue()
 
 
+def _detect_bit_depth(arr: np.ndarray) -> int:
+    """Infer bit depth from the uint16 array's max value.
+
+    Convention from `bench/corpus/synthesis/deep_color.py`:
+      - 10-bit values are in [0, 1023]
+      - 12-bit values are in [0, 4095]
+      - 16-bit values are in [0, 65535]
+    """
+    max_val = int(arr.max()) if arr.size else 0
+    if max_val < 1024:
+        return 10
+    if max_val < 4096:
+        return 12
+    return 16
+
+
+def _encode_jxl_deep(arr: np.ndarray, *, quality: int = 90, bit_depth: int = 10) -> bytes:
+    """Encode uint16 ndarray (H, W, C) as JXL with native bit depth.
+
+    Uses `jxlpy.JXLPyEncoder` typed-buffer API which accepts uint16 pixel data
+    and preserves the requested bit depth in the output container.
+    """
+    from jxlpy import JXLPyEncoder
+
+    h, w = arr.shape[:2]
+    channels = arr.shape[2] if arr.ndim == 3 else 1
+    if channels == 3:
+        colorspace = "RGB"
+    elif channels == 4:
+        colorspace = "RGBA"
+    else:
+        colorspace = "Gray"
+    enc = JXLPyEncoder(
+        quality=quality,
+        colorspace=colorspace,
+        size=(w, h),
+        bit_depth=bit_depth,
+        num_threads=0,
+    )
+    enc.add_frame(arr.tobytes(order="C"))
+    return enc.get_output()
+
+
+def _encode_heic_deep(arr: np.ndarray, *, quality: int = 85, bit_depth: int = 10) -> bytes:
+    """Encode uint16 ndarray as HEIC via pillow_heif typed-buffer API.
+
+    Requires pillow_heif ≥ 0.22 with typed-buffer support (from_bytes with
+    high-bit-depth modes like 'RGB;10').
+    """
+    import pillow_heif
+
+    if bit_depth not in (10, 12):
+        raise FormatNotSupportedError(
+            f"HEIC typed-buffer requires bit_depth in (10, 12); got {bit_depth}"
+        )
+    h, w = arr.shape[:2]
+    channels = arr.shape[2] if arr.ndim == 3 else 1
+    mode = f"RGB;{bit_depth}" if channels == 3 else f"RGBA;{bit_depth}"
+    try:
+        img = pillow_heif.from_bytes(mode=mode, size=(w, h), data=arr.tobytes(order="C"))
+        buf = io.BytesIO()
+        img.save(buf, format="HEIF", quality=quality)
+        return buf.getvalue()
+    except Exception as exc:
+        raise FormatNotSupportedError(
+            f"pillow_heif HEIC typed-buffer encode failed: {exc}"
+        ) from exc
+
+
+def _encode_avif_deep(arr: np.ndarray, *, quality: int = 65, bit_depth: int = 10) -> bytes:
+    """Encode uint16 ndarray as AVIF via pillow_heif typed-buffer API.
+
+    Same typed-buffer flow as HEIC but writes format='AVIF'.  Some older
+    pillow_heif builds only encode AVIF from 8-bit; raises `FormatNotSupportedError`
+    with a clear message if the typed-buffer save fails.
+    """
+    import pillow_heif
+
+    if bit_depth not in (10, 12):
+        raise FormatNotSupportedError(
+            f"AVIF typed-buffer requires bit_depth in (10, 12); got {bit_depth}"
+        )
+    h, w = arr.shape[:2]
+    channels = arr.shape[2] if arr.ndim == 3 else 1
+    mode = f"RGB;{bit_depth}" if channels == 3 else f"RGBA;{bit_depth}"
+    try:
+        img = pillow_heif.from_bytes(mode=mode, size=(w, h), data=arr.tobytes(order="C"))
+        buf = io.BytesIO()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            img.save(buf, format="AVIF", quality=quality)
+        return buf.getvalue()
+    except Exception as exc:
+        raise FormatNotSupportedError(
+            f"pillow_heif AVIF typed-buffer encode failed: {exc}"
+        ) from exc
+
+
 def _encode_heic(content: Synthesized, *, quality: int = 85) -> bytes:
     if not _HEIC_AVAILABLE:
         raise FormatNotSupportedError("pillow_heif not installed")
+    if isinstance(content, np.ndarray):
+        bit_depth = _detect_bit_depth(content)
+        return _encode_heic_deep(content, quality=quality, bit_depth=bit_depth)
     img = _to_rgb(_first_frame(content))
     buf = io.BytesIO()
     img.save(buf, format="HEIF", quality=quality)
@@ -217,6 +330,9 @@ def _encode_heic(content: Synthesized, *, quality: int = 85) -> bytes:
 def _encode_avif(content: Synthesized, *, quality: int = 65) -> bytes:
     if not _AVIF_AVAILABLE:
         raise FormatNotSupportedError("pillow_heif AVIF support not installed")
+    if isinstance(content, np.ndarray):
+        bit_depth = _detect_bit_depth(content)
+        return _encode_avif_deep(content, quality=quality, bit_depth=bit_depth)
     img = _to_rgb(_first_frame(content))
     buf = io.BytesIO()
     with warnings.catch_warnings():
@@ -228,6 +344,9 @@ def _encode_avif(content: Synthesized, *, quality: int = 65) -> bytes:
 def _encode_jxl(content: Synthesized, *, quality: int = 85) -> bytes:
     if not _JXL_AVAILABLE:
         raise FormatNotSupportedError("pillow_jxl / jxlpy not installed")
+    if isinstance(content, np.ndarray):
+        bit_depth = _detect_bit_depth(content)
+        return _encode_jxl_deep(content, quality=quality, bit_depth=bit_depth)
     img = _first_frame(content)
     buf = io.BytesIO()
     img.save(buf, format="JXL", quality=quality)

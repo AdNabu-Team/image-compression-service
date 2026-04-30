@@ -792,6 +792,86 @@
         "worst_case"
       ],
       "expected_pixel_sha256": "be992cc28c17a53bfcf0d546abe25e41514b0c9403100fca7f1fbddf634e8fa4"
+    },
+    {
+      "name": "deep_color_10bit_small_jxl",
+      "bucket": "small",
+      "content_kind": "deep_color_smooth",
+      "seed": 100,
+      "width": 1024,
+      "height": 768,
+      "output_formats": [
+        "jxl"
+      ],
+      "params": {
+        "bit_depth": 10
+      },
+      "tags": [
+        "deep_color",
+        "hdr"
+      ],
+      "expected_pixel_sha256": "7d38c2a72c659d4ef1a03eae9159b0f24dd3cc8351918ea1ac2d0a2da27d96a9",
+      "bit_depth": 10
+    },
+    {
+      "name": "deep_color_12bit_medium_jxl",
+      "bucket": "medium",
+      "content_kind": "deep_color_smooth",
+      "seed": 101,
+      "width": 5000,
+      "height": 4000,
+      "output_formats": [
+        "jxl"
+      ],
+      "params": {
+        "bit_depth": 12
+      },
+      "tags": [
+        "deep_color",
+        "hdr"
+      ],
+      "expected_pixel_sha256": "781e64dda655821600208a1111c04bcf2b6bc18075ade2d37dc0653eeeab179e",
+      "bit_depth": 12
+    },
+    {
+      "name": "deep_color_10bit_small_heic",
+      "bucket": "small",
+      "content_kind": "deep_color_smooth",
+      "seed": 102,
+      "width": 160,
+      "height": 120,
+      "output_formats": [
+        "heic"
+      ],
+      "params": {
+        "bit_depth": 10
+      },
+      "tags": [
+        "deep_color",
+        "hdr"
+      ],
+      "expected_pixel_sha256": "f6bcebacf8e0c1b9a1940aabb8622e9c0352f22a15d0ca565427997afcaa3009",
+      "bit_depth": 10
+    },
+    {
+      "name": "deep_color_10bit_small_avif",
+      "bucket": "small",
+      "content_kind": "deep_color_smooth",
+      "seed": 104,
+      "width": 768,
+      "height": 576,
+      "output_formats": [
+        "avif"
+      ],
+      "params": {
+        "bit_depth": 10
+      },
+      "tags": [
+        "deep_color",
+        "hdr"
+      ],
+      "expected_pixel_sha256": "8ca521a173045438d2d875c4cd5c49b51ca7ddce0747bc95af35ad6cef7aaaca",
+      "bit_depth": 10
     }
   ]
 }

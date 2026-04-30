@@ -126,6 +126,7 @@ class ManifestEntry:
     encoded_sha256: dict[str, dict[str, str]] = field(default_factory=dict)
     source: SourceSpec | None = None
     expected_byte_sha256: dict[str, str] | None = None  # {format: sha256} for vector entries
+    bit_depth: int | None = None  # 10/12/16 for deep-color entries; None (≡ 8) for raster
 
     def to_json(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -149,6 +150,8 @@ class ManifestEntry:
             d["source"] = self.source.to_json()
         if self.expected_byte_sha256 is not None:
             d["expected_byte_sha256"] = dict(self.expected_byte_sha256)
+        if self.bit_depth is not None:
+            d["bit_depth"] = self.bit_depth
         return d
 
     @classmethod
@@ -174,6 +177,7 @@ class ManifestEntry:
                     if raw.get("expected_byte_sha256") is not None
                     else None
                 ),
+                bit_depth=int(raw["bit_depth"]) if raw.get("bit_depth") is not None else None,
             )
         except (KeyError, ValueError, TypeError) as e:
             raise ManifestSchemaError(f"invalid entry {raw.get('name', '<unnamed>')}: {e}") from e
