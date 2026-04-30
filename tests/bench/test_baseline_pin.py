@@ -11,11 +11,13 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import yaml
 
 # Canonical location of the pinned baseline relative to the repo root.
 # tests/ is two levels below the project root, so we go up two dirs.
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 BASELINE_PATH = _REPO_ROOT / "reports" / "baseline.core.json"
+BASELINE_UPDATE_WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "bench-baseline-update.yml"
 
 
 # ---------------------------------------------------------------------------
@@ -94,4 +96,53 @@ def test_baseline_renders_as_markdown():
     assert "## Per-case results" in md, (
         "'## Per-case results' header not found in markdown output. "
         "The baseline may have zero successful iterations."
+    )
+
+
+# ---------------------------------------------------------------------------
+# 4. bench-baseline-update workflow YAML is valid and has required keys
+# ---------------------------------------------------------------------------
+
+
+def test_baseline_update_workflow_yaml_valid():
+    """bench-baseline-update.yml must parse as valid YAML and contain the
+    required structural keys: permissions (contents + issues), concurrency
+    with cancel-in-progress=false, and the [skip ci] guard on the job's if:.
+    """
+    assert BASELINE_UPDATE_WORKFLOW.exists(), (
+        f"Workflow file not found at {BASELINE_UPDATE_WORKFLOW}. "
+        "Expected .github/workflows/bench-baseline-update.yml to exist."
+    )
+
+    wf = yaml.safe_load(BASELINE_UPDATE_WORKFLOW.read_text())
+
+    # Top-level permissions
+    perms = wf.get("permissions", {})
+    assert (
+        perms.get("contents") == "write"
+    ), "permissions.contents must be 'write' so the bot commit can push to main"
+    assert (
+        perms.get("issues") == "write"
+    ), "permissions.issues must be 'write' so the drift issue can be opened"
+
+    # Concurrency — must NOT cancel so back-to-back merges serialize correctly
+    concurrency = wf.get("concurrency", {})
+    assert concurrency.get("cancel-in-progress") is False, (
+        "concurrency.cancel-in-progress must be false so serialized merges "
+        "each get a baseline check rather than the later one cancelling the earlier"
+    )
+
+    # Job-level [skip ci] guard
+    jobs = wf.get("jobs", {})
+    assert jobs, "No jobs defined in the workflow"
+    job_name = next(iter(jobs))
+    job = jobs[job_name]
+    job_if = job.get("if", "")
+    assert "[skip ci]" in str(job_if), (
+        "The job 'if:' condition must guard against [skip ci] commits "
+        "to prevent the bot's own refresh commit from re-triggering the workflow"
+    )
+    assert "[skip bench-baseline]" in str(job_if), (
+        "The job 'if:' condition must guard against [skip bench-baseline] commits "
+        "to allow opting out of baseline refresh on individual pushes"
     )

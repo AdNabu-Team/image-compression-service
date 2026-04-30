@@ -98,6 +98,8 @@ The workflow `.github/workflows/bench-pr.yml` runs automatically on pull request
 
 **No-baseline path**: If `reports/baseline.core.json` is missing, the workflow posts a "no baseline; this run is the candidate baseline" comment and does not fail.
 
+**Auto-baseline-update on main merge**: `.github/workflows/bench-baseline-update.yml` runs `bench.run --mode quick --manifest core` after every merge to main. If the new run is statistically indistinguishable from the previous baseline (`bench.compare --threshold-pct 10` exits 0), the workflow commits the refreshed baseline as `chore(bench): refresh baseline.core.json [skip ci]`. If the comparison detects significant deltas, the workflow opens a `bench, drift` issue with the markdown diff for human triage rather than overwriting the baseline. This guards against gradual regressions normalizing into the baseline.
+
 **How to refresh the baseline** (run locally, then commit the result):
 
 ```bash
