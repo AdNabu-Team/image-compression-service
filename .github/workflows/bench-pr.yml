@@ -1,0 +1,120 @@
+name: bench-pr
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'optimizers/**'
+      - 'estimation/**'
+      - 'utils/**'
+      - 'bench/**'
+      - 'schemas.py'
+      - 'requirements.txt'
+      - 'Dockerfile'
+      - '.github/workflows/bench-pr.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  # Cancel earlier runs of this workflow on the same PR when a new push arrives.
+  group: bench-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  bench:
+    name: Quick-mode benchmark vs baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build pare image (with layer cache)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          load: true
+          tags: pare:pr-${{ github.run_id }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build corpus + run quick mode in container
+        run: |
+          mkdir -p reports
+          docker run --rm \
+            -v "$(pwd):/work" \
+            -w /work \
+            pare:pr-${{ github.run_id }} \
+            bash -c "python -m bench.corpus build --manifest core && \
+                     python -m bench.run --mode quick --manifest core \
+                       --annotate ci=github \
+                       --annotate pr=${{ github.event.pull_request.number }} \
+                       --out reports/_head.json"
+
+      - name: Compare against baseline (or seed if missing)
+        id: compare
+        run: |
+          if [ ! -f reports/baseline.core.json ]; then
+            echo "no-baseline=true" >> "$GITHUB_OUTPUT"
+            printf '_No baseline found at `reports/baseline.core.json`. Treating this run as the candidate baseline._\n\n' > /tmp/compare.md
+            docker run --rm \
+              -v "$(pwd):/work" \
+              -w /work \
+              pare:pr-${{ github.run_id }} \
+              python -m bench.run report reports/_head.json --format markdown \
+              >> /tmp/compare.md
+          else
+            echo "no-baseline=false" >> "$GITHUB_OUTPUT"
+            set +e
+            docker run --rm \
+              -v "$(pwd):/work" \
+              -w /work \
+              pare:pr-${{ github.run_id }} \
+              python -m bench.compare reports/baseline.core.json reports/_head.json \
+                --threshold-pct 10 --format markdown \
+              > /tmp/compare.md
+            echo "compare-exit=$?" >> "$GITHUB_OUTPUT"
+            set -e
+          fi
+
+      - name: Compose PR comment
+        run: |
+          {
+            echo '<!-- pare-bench-comment -->'
+            echo ""
+            echo "## Pare bench — \`quick\` mode vs baseline"
+            echo ""
+            echo "_Run: [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) · Head: \`${{ github.event.pull_request.head.sha }}\` · Threshold: \`±10%\`_"
+            echo ""
+            cat /tmp/compare.md
+            echo ""
+            echo "<sub>Posted by \`.github/workflows/bench-pr.yml\`.</sub>"
+          } > /tmp/comment.md
+
+      - name: Find existing bench comment
+        id: find-comment
+        uses: peter-evans/find-comment@v3
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body-includes: '<!-- pare-bench-comment -->'
+          direction: last
+
+      - name: Post or update PR comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body-path: /tmp/comment.md
+          edit-mode: replace
+
+      - name: Fail if regression detected
+        if: steps.compare.outputs.no-baseline == 'false' && steps.compare.outputs.compare-exit != '0'
+        run: |
+          echo "::error::bench.compare detected regressions exceeding ±10% threshold; see PR comment for details."
+          exit 1

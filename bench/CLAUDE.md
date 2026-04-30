@@ -78,6 +78,36 @@ python -m bench.run --mode memory --out reports/memory.json
 python -m bench.compare reports/baseline.json reports/head.json --threshold-pct 10
 ```
 
+## CI integration
+
+The workflow `.github/workflows/bench-pr.yml` runs automatically on pull requests that touch `optimizers/`, `estimation/`, `utils/`, `bench/`, `schemas.py`, `requirements.txt`, `Dockerfile`, or the workflow file itself.
+
+**Baseline location**: `reports/baseline.core.json` — checked into the repo (unignored via `.gitignore`).
+
+**What CI does**:
+1. Builds the Docker image from the PR's source tree (with Buildx GHA layer cache for speed).
+2. Inside the container, runs `python -m bench.corpus build --manifest core` then `python -m bench.run --mode quick --manifest core --out reports/_head.json`.
+3. Runs `python -m bench.compare reports/baseline.core.json reports/_head.json --threshold-pct 10 --format markdown`.
+4. Posts (or updates) a PR comment with the diff table. A hidden HTML signature `<!-- pare-bench-comment -->` ensures repeat pushes update the same comment rather than creating new ones.
+5. Fails the workflow if `bench.compare` exits non-zero (regression in at least one case exceeds ±10%).
+
+**Threshold**: ±10% change in median `wall_ms`. Both Welch's t-test (α=0.05) and Cohen's d (≥0.5) must clear before a case is flagged — see `bench/runner/compare.py` for the full logic.
+
+**No-baseline path**: If `reports/baseline.core.json` is missing, the workflow posts a "no baseline; this run is the candidate baseline" comment and does not fail.
+
+**How to refresh the baseline** (run locally, then commit the result):
+
+```bash
+python -m bench.corpus build --manifest core
+python -m bench.run --mode quick --manifest core \
+  --annotate "env=local-venv-bootstrap" \
+  --out reports/baseline.core.json
+git add reports/baseline.core.json
+git commit -m "chore(bench): refresh baseline.core.json"
+```
+
+Refresh the baseline whenever you intentionally change optimizer behavior, add corpus entries, or when you want to adopt the Docker-built numbers as the new reference (run the CI workflow on a clean branch, pull `reports/_head.json` from the artifact, rename it, and commit).
+
 ## Code style
 
 Same as repo root: Black 100 cols, Ruff E/F/W/I, Python 3.12, pytest-asyncio.

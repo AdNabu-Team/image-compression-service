@@ -48,6 +48,11 @@ python -m bench.compare reports/baseline.json reports/head.json --threshold-pct 
 # Render a run as Markdown (PR comment / step summary)
 python -m bench.run report reports/bench.json --format markdown
 
+# Refresh the pinned CI baseline (commit the result to trigger workflow comparison)
+python -m bench.run --mode quick --manifest core \
+  --annotate "env=local-venv-bootstrap" --out reports/baseline.core.json
+# See .github/workflows/bench-pr.yml — PRs auto-compare against this baseline
+
 # Docker
 docker-compose up          # Pare + Redis (local dev)
 docker build -t pare .     # Full build with jpegli, MozJPEG, JXL tools
