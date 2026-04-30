@@ -32,7 +32,9 @@ def _entry(kind: str, *, seed: int = 1, w: int = 96, h: int = 96, **params) -> M
 
 # Stub kinds that intentionally raise rather than produce pixels — skip them
 # in the parametrised synthesizer tests (they have their own error-path tests).
-_STUB_KINDS = {"fetched_photo"}
+# fetched_photo: raster fetched entries (builder uses fetch + Image.open)
+# fetched_vector: vector fetched entries (builder uses fetch + byte pass-through)
+_STUB_KINDS = {"fetched_photo", "fetched_vector"}
 
 _SYNTHESIZABLE_KINDS = [k for k in known_kinds() if k not in _STUB_KINDS]
 

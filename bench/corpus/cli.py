@@ -96,7 +96,13 @@ def cmd_verify(args: argparse.Namespace) -> int:
     cache_root = DEFAULT_CACHE_ROOT
 
     def _synthesize_or_fetch(entry):
-        """Dispatch to fetcher or synthesizer depending on entry type."""
+        """Dispatch to fetcher/vector-loader or synthesizer depending on entry type."""
+        from bench.corpus.manifest import is_vector_entry
+
+        if is_vector_entry(entry):
+            from bench.corpus.builder import _load_vector_bytes
+
+            return _load_vector_bytes(entry, cache_root)
         if entry.source is not None:
             from bench.corpus.builder import _load_fetched_content
 
@@ -110,7 +116,10 @@ def cmd_verify(args: argparse.Namespace) -> int:
         for line in result.schema_errors:
             print(f"  {line}", file=sys.stderr)
     if result.missing:
-        print("MISSING (no expected_pixel_sha256 — run `build --seal`):", file=sys.stderr)
+        print(
+            "MISSING (no expected_pixel_sha256 / expected_byte_sha256 — run `build --seal`):",
+            file=sys.stderr,
+        )
         for line in result.missing:
             print(f"  {line}", file=sys.stderr)
     if result.mismatches:

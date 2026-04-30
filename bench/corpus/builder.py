@@ -30,10 +30,12 @@ from bench.corpus.conversion import (
 )
 from bench.corpus.fetchers import DEFAULT_CACHE_ROOT, fetch
 from bench.corpus.manifest import (
+    _VECTOR_FORMATS,
     Manifest,
     ManifestEntry,
     Synthesized,
     bucket_for_size,
+    is_vector_entry,
     pixel_sha256,
 )
 from bench.corpus.sizing import in_bucket
@@ -50,6 +52,7 @@ class BuildOutcome:
     format_skipped: list[str] = field(default_factory=list)
     pixel_hashes: dict[str, str] = field(default_factory=dict)
     source_hashes: dict[str, str] = field(default_factory=dict)
+    byte_hashes: dict[str, str] = field(default_factory=dict)  # {entry_name: sha256} for vectors
 
     @property
     def ok(self) -> bool:
@@ -102,6 +105,36 @@ def _load_fetched_content(entry: ManifestEntry, cache_root: Path) -> Synthesized
     return img.copy()
 
 
+def _load_vector_bytes(entry: ManifestEntry, cache_root: Path) -> bytes:
+    """Fetch a vector entry and return the raw source bytes.
+
+    No Image.open() — SVG/SVGZ sources are XML, not raster pixels.
+    The fetcher verifies the SHA-256 of the downloaded bytes before returning.
+    """
+    path = fetch(entry.source, cache_root)  # type: ignore[arg-type]
+    return path.read_bytes()
+
+
+def _check_no_mixed_vector_raster(entry: ManifestEntry) -> str | None:
+    """Return an error string if the entry mixes vector and raster output formats.
+
+    Mixed entries are forbidden: if any output_format is a vector format, ALL
+    output_formats must be vector formats.  This prevents confusing code paths
+    where the same content would be routed through both Image.open() and
+    pass-through paths.
+    """
+    has_vector = any(fmt in _VECTOR_FORMATS for fmt in entry.output_formats)
+    has_raster = any(fmt not in _VECTOR_FORMATS for fmt in entry.output_formats)
+    if has_vector and has_raster:
+        vector_fmts = [f for f in entry.output_formats if f in _VECTOR_FORMATS]
+        raster_fmts = [f for f in entry.output_formats if f not in _VECTOR_FORMATS]
+        return (
+            f"{entry.name}: output_formats mixes vector {vector_fmts} and raster {raster_fmts}. "
+            f"Vector and raster formats cannot share an entry — split into separate entries."
+        )
+    return None
+
+
 def build(
     manifest: Manifest,
     corpus_root: Path,
@@ -119,22 +152,45 @@ def build(
     entries = manifest.filter(bucket=bucket_filter, tag=tag_filter)
 
     for entry in entries:
-        if entry.source is not None:
-            # Fetched entry — skip synthesis; download and decode from source URL
+        # Reject mixed vector+raster entries early
+        mix_error = _check_no_mixed_vector_raster(entry)
+        if mix_error:
+            outcome.bucket_violations.append(mix_error)
+            continue
+
+        if is_vector_entry(entry):
+            # Vector path: fetch raw bytes; bypass Image.open()
+            if entry.source is None:
+                outcome.bucket_violations.append(
+                    f"{entry.name}: vector entry has no source URL — "
+                    f"fetched_vector entries must provide entry.source"
+                )
+                continue
+            try:
+                content: Synthesized = _load_vector_bytes(entry, cache_root)
+                outcome.source_hashes[entry.name] = entry.source.sha256
+                outcome.byte_hashes[entry.name] = hashlib.sha256(content).hexdigest()  # type: ignore[arg-type]
+            except Exception as e:
+                outcome.bucket_violations.append(f"{entry.name}: vector fetch failed: {e}")
+                continue
+            # No pixel_sha256 for vector entries
+        elif entry.source is not None:
+            # Fetched raster entry — download and decode from source URL
             try:
                 content = _load_fetched_content(entry, cache_root)
                 outcome.source_hashes[entry.name] = entry.source.sha256
             except Exception as e:
                 outcome.bucket_violations.append(f"{entry.name}: fetch failed: {e}")
                 continue
+            outcome.pixel_hashes[entry.name] = pixel_sha256(content)
         else:
+            # Synthesized raster entry
             try:
                 content = synthesize(entry)
             except Exception as e:
                 outcome.bucket_violations.append(f"{entry.name}: synthesis failed: {e}")
                 continue
-
-        outcome.pixel_hashes[entry.name] = pixel_sha256(content)
+            outcome.pixel_hashes[entry.name] = pixel_sha256(content)
 
         for fmt in entry.output_formats:
             if formats_filter and fmt not in formats_filter:
@@ -175,11 +231,13 @@ def reseal_manifest(
     manifest: Manifest,
     cache_root: Path = DEFAULT_CACHE_ROOT,
 ) -> Manifest:
-    """Run synthesis (or fetch) once per entry and write current pixel hashes back.
+    """Run synthesis (or fetch) once per entry and write current hashes back.
 
-    Used to populate `expected_pixel_sha256` on a fresh manifest, or to
-    re-seal after an intentional corpus refresh. Output is a new Manifest
-    object — caller is responsible for writing it back to disk.
+    For raster entries: populates `expected_pixel_sha256`.
+    For vector entries: populates `expected_byte_sha256` with the source SHA.
+
+    Output is a new Manifest object — caller is responsible for writing it
+    back to disk.
     """
     sealed = Manifest(
         name=manifest.name,
@@ -188,24 +246,45 @@ def reseal_manifest(
         entries=[],
     )
     for entry in manifest.entries:
-        if entry.source is not None:
-            content = _load_fetched_content(entry, cache_root)
+        if is_vector_entry(entry):
+            # Vector entry: store byte-level SHA of the source bytes
+            raw_bytes = _load_vector_bytes(entry, cache_root)
+            byte_sha = hashlib.sha256(raw_bytes).hexdigest()
+            sealed_entry = ManifestEntry(
+                name=entry.name,
+                bucket=entry.bucket,
+                content_kind=entry.content_kind,
+                seed=entry.seed,
+                width=entry.width,
+                height=entry.height,
+                output_formats=list(entry.output_formats),
+                params=dict(entry.params),
+                tags=list(entry.tags),
+                expected_pixel_sha256=None,  # not applicable for vector
+                encoded_sha256=dict(entry.encoded_sha256),
+                source=entry.source,
+                expected_byte_sha256={"source": byte_sha},
+            )
         else:
-            content = synthesize(entry)
-        sealed_entry = ManifestEntry(
-            name=entry.name,
-            bucket=entry.bucket,
-            content_kind=entry.content_kind,
-            seed=entry.seed,
-            width=entry.width,
-            height=entry.height,
-            output_formats=list(entry.output_formats),
-            params=dict(entry.params),
-            tags=list(entry.tags),
-            expected_pixel_sha256=pixel_sha256(content),
-            encoded_sha256=dict(entry.encoded_sha256),
-            source=entry.source,
-        )
+            if entry.source is not None:
+                content = _load_fetched_content(entry, cache_root)
+            else:
+                content = synthesize(entry)
+            sealed_entry = ManifestEntry(
+                name=entry.name,
+                bucket=entry.bucket,
+                content_kind=entry.content_kind,
+                seed=entry.seed,
+                width=entry.width,
+                height=entry.height,
+                output_formats=list(entry.output_formats),
+                params=dict(entry.params),
+                tags=list(entry.tags),
+                expected_pixel_sha256=pixel_sha256(content),
+                encoded_sha256=dict(entry.encoded_sha256),
+                source=entry.source,
+                expected_byte_sha256=None,
+            )
         sealed.entries.append(sealed_entry)
     return sealed
 

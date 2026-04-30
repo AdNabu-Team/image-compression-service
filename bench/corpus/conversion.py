@@ -7,23 +7,29 @@ registered lazily so that missing optional dependencies (jxlpy, etc.)
 just skip the affected formats with a warning instead of breaking the
 whole build.
 
-Format coverage in v0:
+Format coverage in v0/v1:
 
-| Format | Static | Animated | Deep color |
-|--------|--------|----------|------------|
-| PNG    |   ✓    |     —    |     —      |
-| APNG   |   —    |     ✓    |     —      |
-| JPEG   |   ✓    |     —    |     —      |
-| WEBP   |   ✓    |     ✓    |     —      |
-| GIF    |   ✓    |     ✓    |     —      |
-| BMP    |   ✓    |     —    |     —      |
-| TIFF   |   ✓    |     —    |     —      |
-| HEIC   |   ✓    |     —    |     —      |
-| AVIF   |   ✓    |     —    |     —      |
-| JXL    |   ✓*   |     —    |     —      |
+| Format | Static | Animated | Deep color | Notes                           |
+|--------|--------|----------|------------|---------------------------------|
+| PNG    |   ✓    |     —    |     —      |                                 |
+| APNG   |   —    |     ✓    |     —      |                                 |
+| JPEG   |   ✓    |     —    |     —      |                                 |
+| WEBP   |   ✓    |     ✓    |     —      |                                 |
+| GIF    |   ✓    |     ✓    |     —      |                                 |
+| BMP    |   ✓    |     —    |     —      |                                 |
+| TIFF   |   ✓    |     —    |     —      |                                 |
+| HEIC   |   ✓    |     —    |     —      |                                 |
+| AVIF   |   ✓    |     —    |     —      |                                 |
+| JXL    |   ✓*   |     —    |     —      | requires pillow_jxl / jxlpy     |
+| SVG    |   ✓†   |     —    |     —      | vector pass-through (bytes in)  |
+| SVGZ   |   ✓†   |     —    |     —      | gzip of SVG, mtime=0            |
 
 * JXL requires `pillow_jxl` or `jxlpy` to be installed.
-SVG / SVGZ require vector content_kinds — deferred to v1.
+† SVG/SVGZ use vector pass-through: content must be raw bytes (not a PIL
+  Image). Entries must set `content_kind="fetched_vector"` and provide a
+  `source` URL; the builder bypasses Image.open() for these entries.
+  Determinism contract: byte-level SHA-256 of the source bytes
+  (stored in `expected_byte_sha256["source"]` in the manifest).
 Deep-color encoding is deferred to v1 (jxlpy + pillow_heif typed
 buffers); manifests with deep-color entries skip those formats today.
 """
@@ -228,6 +234,40 @@ def _encode_jxl(content: Synthesized, *, quality: int = 85) -> bytes:
     return buf.getvalue()
 
 
+def _encode_svg(content: Synthesized) -> bytes:
+    """Pass-through: vector sources are already encoded.
+
+    `content` must be raw bytes — the builder supplies the fetched SVG bytes
+    directly without going through Image.open().  Raising here (instead of
+    silently returning garbage) surfaces misconfigured entries early.
+    """
+    if not isinstance(content, (bytes, bytearray)):
+        raise FormatNotSupportedError(
+            "SVG entries must use byte content (set content_kind='fetched_vector' "
+            "and provide entry.source). Got: " + type(content).__name__
+        )
+    return bytes(content)
+
+
+def _encode_svgz(content: Synthesized) -> bytes:
+    """Gzip-compress an SVG source into SVGZ.
+
+    Uses mtime=0 so the output is deterministic across machines and runs.
+    `content` must be raw bytes (same constraint as _encode_svg).
+    """
+    if not isinstance(content, (bytes, bytearray)):
+        raise FormatNotSupportedError(
+            "SVGZ entries must use byte content (set content_kind='fetched_vector' "
+            "and provide entry.source). Got: " + type(content).__name__
+        )
+    import gzip
+
+    buf = io.BytesIO()
+    with gzip.GzipFile(fileobj=buf, mode="wb", mtime=0) as gz:
+        gz.write(bytes(content))
+    return buf.getvalue()
+
+
 # --- Format dispatch -------------------------------------------------------
 
 EncodeKwargs = dict[str, object]
@@ -243,11 +283,16 @@ _ENCODERS: dict[str, Callable[..., bytes]] = {
     "heif": _encode_heic,
     "avif": _encode_avif,
     "jxl": _encode_jxl,
+    "svg": _encode_svg,
+    "svgz": _encode_svgz,
 }
 
 
 def supported_formats() -> list[str]:
-    """Return the formats encodable in the current environment."""
+    """Return the formats encodable in the current environment.
+
+    SVG and SVGZ are always available (stdlib gzip only; no optional plugins).
+    """
     available = []
     for fmt in _ENCODERS:
         if fmt in {"heic", "heif"} and not _HEIC_AVAILABLE:

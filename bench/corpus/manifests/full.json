@@ -3,8 +3,9 @@
   "manifest_name": "full",
   "library_versions": {
     "Pillow": "10.4.0",
-    "numpy": "2.0.2",
-    "pillow_heif": "0.22.0"
+    "numpy": "2.4.4",
+    "pillow_heif": "0.22.0",
+    "jxlpy": "0.9.5"
   },
   "entries": [
     {
@@ -2256,6 +2257,350 @@
         "license": "Public domain",
         "attribution": "Ed Ayers \u2014 PNG transparency demonstration (Wikimedia Commons, public domain)",
         "notes": "800x600 RGBA PNG transparency demonstration"
+      }
+    },
+    {
+      "name": "wikimedia_wikipedia_logo_svg",
+      "bucket": "medium",
+      "content_kind": "fetched_vector",
+      "seed": 0,
+      "width": 0,
+      "height": 0,
+      "output_formats": [
+        "svg"
+      ],
+      "tags": [
+        "vector",
+        "real_world",
+        "wikimedia",
+        "icon",
+        "tier:lite"
+      ],
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/8/80/Wikipedia-logo-v2.svg",
+        "sha256": "90e01ef7af53a6b624fa24ee3a48c7d6dd9f55b0f999bc8c7303f8d289ecd798",
+        "license": "CC BY-SA 3.0",
+        "attribution": "Wikimedia Foundation \u2014 Wikipedia logo v2 (Wikimedia Commons, CC BY-SA 3.0, https://commons.wikimedia.org/wiki/File:Wikipedia-logo-v2.svg)",
+        "notes": "Wikipedia globe logo, complex SVG with paths and text, 165 KB raw"
+      },
+      "expected_byte_sha256": {
+        "source": "90e01ef7af53a6b624fa24ee3a48c7d6dd9f55b0f999bc8c7303f8d289ecd798"
+      }
+    },
+    {
+      "name": "wikimedia_wikipedia_logo_svgz",
+      "bucket": "small",
+      "content_kind": "fetched_vector",
+      "seed": 0,
+      "width": 0,
+      "height": 0,
+      "output_formats": [
+        "svgz"
+      ],
+      "tags": [
+        "vector",
+        "real_world",
+        "wikimedia",
+        "icon",
+        "tier:lite"
+      ],
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/8/80/Wikipedia-logo-v2.svg",
+        "sha256": "90e01ef7af53a6b624fa24ee3a48c7d6dd9f55b0f999bc8c7303f8d289ecd798",
+        "license": "CC BY-SA 3.0",
+        "attribution": "Wikimedia Foundation \u2014 Wikipedia logo v2 (Wikimedia Commons, CC BY-SA 3.0, https://commons.wikimedia.org/wiki/File:Wikipedia-logo-v2.svg)",
+        "notes": "Wikipedia globe logo gzip-compressed, 54 KB SVGZ"
+      },
+      "expected_byte_sha256": {
+        "source": "90e01ef7af53a6b624fa24ee3a48c7d6dd9f55b0f999bc8c7303f8d289ecd798"
+      }
+    },
+    {
+      "name": "wikimedia_html5_logo_svg",
+      "bucket": "tiny",
+      "content_kind": "fetched_vector",
+      "seed": 0,
+      "width": 0,
+      "height": 0,
+      "output_formats": [
+        "svg",
+        "svgz"
+      ],
+      "tags": [
+        "vector",
+        "real_world",
+        "wikimedia",
+        "logo",
+        "tier:lite"
+      ],
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/6/61/HTML5_logo_and_wordmark.svg",
+        "sha256": "ed8b74df7ec0623b8b54f8d0433d33fb6dff6ea35061b98ee50e6c0be211b66d",
+        "license": "CC BY 3.0",
+        "attribution": "W3C \u2014 HTML5 logo and wordmark (Wikimedia Commons, CC BY 3.0, https://commons.wikimedia.org/wiki/File:HTML5_logo_and_wordmark.svg)",
+        "notes": "HTML5 branded logo with wordmark, simple geometric paths, 674 bytes"
+      },
+      "expected_byte_sha256": {
+        "source": "ed8b74df7ec0623b8b54f8d0433d33fb6dff6ea35061b98ee50e6c0be211b66d"
+      }
+    },
+    {
+      "name": "wikimedia_wikibooks_logo_svg",
+      "bucket": "small",
+      "content_kind": "fetched_vector",
+      "seed": 0,
+      "width": 0,
+      "height": 0,
+      "output_formats": [
+        "svg"
+      ],
+      "tags": [
+        "vector",
+        "real_world",
+        "wikimedia",
+        "logo",
+        "tier:lite"
+      ],
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/d/df/Wikibooks-logo-en-noslogan.svg",
+        "sha256": "598295be898f03bc52c0cff4792b29042da1059223dab69e637ac5b239f180be",
+        "license": "CC BY-SA 3.0",
+        "attribution": "Wikimedia Foundation \u2014 Wikibooks logo (Wikimedia Commons, CC BY-SA 3.0, https://commons.wikimedia.org/wiki/File:Wikibooks-logo-en-noslogan.svg)",
+        "notes": "Wikibooks English logo without slogan, open-book icon, 12.9 KB raw"
+      },
+      "expected_byte_sha256": {
+        "source": "598295be898f03bc52c0cff4792b29042da1059223dab69e637ac5b239f180be"
+      }
+    },
+    {
+      "name": "wikimedia_wikibooks_logo_svgz",
+      "bucket": "tiny",
+      "content_kind": "fetched_vector",
+      "seed": 0,
+      "width": 0,
+      "height": 0,
+      "output_formats": [
+        "svgz"
+      ],
+      "tags": [
+        "vector",
+        "real_world",
+        "wikimedia",
+        "logo",
+        "tier:lite"
+      ],
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/d/df/Wikibooks-logo-en-noslogan.svg",
+        "sha256": "598295be898f03bc52c0cff4792b29042da1059223dab69e637ac5b239f180be",
+        "license": "CC BY-SA 3.0",
+        "attribution": "Wikimedia Foundation \u2014 Wikibooks logo (Wikimedia Commons, CC BY-SA 3.0, https://commons.wikimedia.org/wiki/File:Wikibooks-logo-en-noslogan.svg)",
+        "notes": "Wikibooks English logo gzip-compressed, 4.6 KB SVGZ"
+      },
+      "expected_byte_sha256": {
+        "source": "598295be898f03bc52c0cff4792b29042da1059223dab69e637ac5b239f180be"
+      }
+    },
+    {
+      "name": "wikimedia_flag_us_svg",
+      "bucket": "tiny",
+      "content_kind": "fetched_vector",
+      "seed": 0,
+      "width": 0,
+      "height": 0,
+      "output_formats": [
+        "svg",
+        "svgz"
+      ],
+      "tags": [
+        "vector",
+        "real_world",
+        "wikimedia",
+        "flag",
+        "tier:lite"
+      ],
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/a/a9/Flag_of_the_United_States_%28DoS_ECA_Color_Standard%29.svg",
+        "sha256": "cbddb05378ecb35f64a7726ea4a41c311145c06fce92626377d7538413fcf6bf",
+        "license": "Public domain",
+        "attribution": "U.S. Department of State \u2014 Flag of the United States (DoS ECA Color Standard) (Wikimedia Commons, public domain, https://commons.wikimedia.org/wiki/File:Flag_of_the_United_States_(DoS_ECA_Color_Standard).svg)",
+        "notes": "US flag, geometric stripes and star pattern, 799 bytes"
+      },
+      "expected_byte_sha256": {
+        "source": "cbddb05378ecb35f64a7726ea4a41c311145c06fce92626377d7538413fcf6bf"
+      }
+    },
+    {
+      "name": "wikimedia_flag_philippines_svg",
+      "bucket": "tiny",
+      "content_kind": "fetched_vector",
+      "seed": 0,
+      "width": 0,
+      "height": 0,
+      "output_formats": [
+        "svg",
+        "svgz"
+      ],
+      "tags": [
+        "vector",
+        "real_world",
+        "wikimedia",
+        "flag",
+        "tier:full"
+      ],
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/9/99/Flag_of_the_Philippines.svg",
+        "sha256": "b0010e0b5f5945506e98b76f3469faf964c1ce30de75673186d303f9112b5454",
+        "license": "Public domain",
+        "attribution": "Philippine government \u2014 Flag of the Philippines (Wikimedia Commons, public domain, https://commons.wikimedia.org/wiki/File:Flag_of_the_Philippines.svg)",
+        "notes": "Philippine flag with sun and stars motif, 892 bytes"
+      },
+      "expected_byte_sha256": {
+        "source": "b0010e0b5f5945506e98b76f3469faf964c1ce30de75673186d303f9112b5454"
+      }
+    },
+    {
+      "name": "wikimedia_flag_italy_svg",
+      "bucket": "tiny",
+      "content_kind": "fetched_vector",
+      "seed": 0,
+      "width": 0,
+      "height": 0,
+      "output_formats": [
+        "svg",
+        "svgz"
+      ],
+      "tags": [
+        "vector",
+        "real_world",
+        "wikimedia",
+        "flag",
+        "tier:full"
+      ],
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/0/03/Flag_of_Italy.svg",
+        "sha256": "c939e50605c5a08df1aaf19818f74d2919a9d3c3b7aa7cd90520b8bfc9c5dddc",
+        "license": "Public domain",
+        "attribution": "Italian government \u2014 Flag of Italy (Wikimedia Commons, public domain, https://commons.wikimedia.org/wiki/File:Flag_of_Italy.svg)",
+        "notes": "Italian tricolour, minimal 3-stripe SVG, 273 bytes"
+      },
+      "expected_byte_sha256": {
+        "source": "c939e50605c5a08df1aaf19818f74d2919a9d3c3b7aa7cd90520b8bfc9c5dddc"
+      }
+    },
+    {
+      "name": "wikimedia_flag_turkey_svg",
+      "bucket": "tiny",
+      "content_kind": "fetched_vector",
+      "seed": 0,
+      "width": 0,
+      "height": 0,
+      "output_formats": [
+        "svg",
+        "svgz"
+      ],
+      "tags": [
+        "vector",
+        "real_world",
+        "wikimedia",
+        "flag",
+        "tier:full"
+      ],
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/b/b4/Flag_of_Turkey.svg",
+        "sha256": "5a47e932cdb371d9708d8c9a209d3acfd006cdd3ee7dd38ae44df6180e170e90",
+        "license": "Public domain",
+        "attribution": "Turkish government \u2014 Flag of Turkey (Wikimedia Commons, public domain, https://commons.wikimedia.org/wiki/File:Flag_of_Turkey.svg)",
+        "notes": "Turkish flag with crescent and star, 324 bytes"
+      },
+      "expected_byte_sha256": {
+        "source": "5a47e932cdb371d9708d8c9a209d3acfd006cdd3ee7dd38ae44df6180e170e90"
+      }
+    },
+    {
+      "name": "wikimedia_flag_argentina_svg",
+      "bucket": "tiny",
+      "content_kind": "fetched_vector",
+      "seed": 0,
+      "width": 0,
+      "height": 0,
+      "output_formats": [
+        "svg",
+        "svgz"
+      ],
+      "tags": [
+        "vector",
+        "real_world",
+        "wikimedia",
+        "flag",
+        "tier:full"
+      ],
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/1/1a/Flag_of_Argentina.svg",
+        "sha256": "dafb5bc6543c59249be9c7dec2298eaeaa1fe7805a62754990315cc6db93b2f3",
+        "license": "Public domain",
+        "attribution": "Argentinian government \u2014 Flag of Argentina (Wikimedia Commons, public domain, https://commons.wikimedia.org/wiki/File:Flag_of_Argentina.svg)",
+        "notes": "Argentinian flag with Sol de Mayo sun symbol, 4994 bytes"
+      },
+      "expected_byte_sha256": {
+        "source": "dafb5bc6543c59249be9c7dec2298eaeaa1fe7805a62754990315cc6db93b2f3"
+      }
+    },
+    {
+      "name": "wikimedia_flag_france_svg",
+      "bucket": "tiny",
+      "content_kind": "fetched_vector",
+      "seed": 0,
+      "width": 0,
+      "height": 0,
+      "output_formats": [
+        "svg",
+        "svgz"
+      ],
+      "tags": [
+        "vector",
+        "real_world",
+        "wikimedia",
+        "flag",
+        "tier:full"
+      ],
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/c/c3/Flag_of_France.svg",
+        "sha256": "e949902c7677422d88137d385b9edbe91323470c7933824cc968aca3965fc37c",
+        "license": "Public domain",
+        "attribution": "French government \u2014 Flag of France (Wikimedia Commons, public domain, https://commons.wikimedia.org/wiki/File:Flag_of_France.svg)",
+        "notes": "French tricolour, minimal 3-stripe SVG, 193 bytes"
+      },
+      "expected_byte_sha256": {
+        "source": "e949902c7677422d88137d385b9edbe91323470c7933824cc968aca3965fc37c"
+      }
+    },
+    {
+      "name": "wikimedia_aws_logo_svg",
+      "bucket": "tiny",
+      "content_kind": "fetched_vector",
+      "seed": 0,
+      "width": 0,
+      "height": 0,
+      "output_formats": [
+        "svg",
+        "svgz"
+      ],
+      "tags": [
+        "vector",
+        "real_world",
+        "wikimedia",
+        "logo",
+        "tier:full"
+      ],
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/9/93/Amazon_Web_Services_Logo.svg",
+        "sha256": "1f52a1d5f3c11d1452aac763e53ca9e74d6635298feb077059903595ca408206",
+        "license": "Public domain",
+        "attribution": "Amazon.com \u2014 Amazon Web Services Logo (Wikimedia Commons, public domain, https://commons.wikimedia.org/wiki/File:Amazon_Web_Services_Logo.svg)",
+        "notes": "AWS logo with wordmark, curved-arrow graphic and text, 3474 bytes"
+      },
+      "expected_byte_sha256": {
+        "source": "1f52a1d5f3c11d1452aac763e53ca9e74d6635298feb077059903595ca408206"
       }
     }
   ]

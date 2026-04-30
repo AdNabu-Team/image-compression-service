@@ -101,8 +101,13 @@ class ManifestEntry:
 
     `expected_pixel_sha256` is computed from the synthesizer output's raw
     pixel bytes (after a normalized mode conversion). It is the canonical
-    determinism contract — encoded outputs may differ across libraries and
-    CPUs, but the pixel array does not.
+    determinism contract for raster entries — encoded outputs may differ
+    across libraries and CPUs, but the pixel array does not.
+
+    `expected_byte_sha256` is the determinism contract for vector entries
+    (SVG/SVGZ).  Vector sources are XML, not pixels; the encoded bytes are
+    deterministic (no SIMD variance), so a flat {format: sha256} mapping is
+    sufficient.  Raster entries have this set to None.
 
     `output_formats` lists which encoded files the conversion stage will
     derive from this entry. Bucket validation runs on each derived file.
@@ -120,6 +125,7 @@ class ManifestEntry:
     expected_pixel_sha256: str | None = None
     encoded_sha256: dict[str, dict[str, str]] = field(default_factory=dict)
     source: SourceSpec | None = None
+    expected_byte_sha256: dict[str, str] | None = None  # {format: sha256} for vector entries
 
     def to_json(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -141,6 +147,8 @@ class ManifestEntry:
             d["encoded_sha256"] = self.encoded_sha256
         if self.source is not None:
             d["source"] = self.source.to_json()
+        if self.expected_byte_sha256 is not None:
+            d["expected_byte_sha256"] = dict(self.expected_byte_sha256)
         return d
 
     @classmethod
@@ -161,6 +169,11 @@ class ManifestEntry:
                 expected_pixel_sha256=raw.get("expected_pixel_sha256"),
                 encoded_sha256=dict(raw.get("encoded_sha256") or {}),
                 source=source,
+                expected_byte_sha256=(
+                    dict(raw["expected_byte_sha256"])
+                    if raw.get("expected_byte_sha256") is not None
+                    else None
+                ),
             )
         except (KeyError, ValueError, TypeError) as e:
             raise ManifestSchemaError(f"invalid entry {raw.get('name', '<unnamed>')}: {e}") from e
@@ -326,35 +339,79 @@ class VerifyResult:
         return 0
 
 
+_VECTOR_FORMATS: frozenset[str] = frozenset({"svg", "svgz"})
+
+
+def is_vector_entry(entry: "ManifestEntry") -> bool:
+    """Return True if all output_formats for this entry are vector formats."""
+    return bool(entry.output_formats) and all(
+        fmt in _VECTOR_FORMATS for fmt in entry.output_formats
+    )
+
+
 SynthesizeFunc = Callable[[ManifestEntry], Synthesized]
 
 
 def verify(manifest: Manifest, synthesize: SynthesizeFunc) -> VerifyResult:
     """Re-synthesize every entry and compare against expected_pixel_sha256.
 
-    Entries with no expected_pixel_sha256 (a freshly-built unsealed manifest)
-    are reported as missing. The caller must have run `build --update-manifest`
-    first to populate the hashes.
+    For raster entries: compares against expected_pixel_sha256 (pixel bytes).
+    For vector entries: compares against expected_byte_sha256 (raw source bytes).
+
+    Entries with no hash sealed (a freshly-built unsealed manifest) are
+    reported as missing. The caller must have run `build --seal` first to
+    populate the hashes.
     """
     mismatches: list[str] = []
     missing: list[str] = []
     schema_errors: list[str] = []
 
     for entry in manifest.entries:
-        if entry.expected_pixel_sha256 is None:
-            missing.append(f"{entry.name} (manifest has no expected_pixel_sha256)")
-            continue
-        try:
-            image = synthesize(entry)
-        except Exception as e:
-            schema_errors.append(f"{entry.name}: synthesis failed: {e}")
-            continue
-        actual = pixel_sha256(image)
-        if actual != entry.expected_pixel_sha256:
-            mismatches.append(
-                f"{entry.name}: expected={entry.expected_pixel_sha256[:12]} "
-                f"actual={actual[:12]}"
-            )
+        if is_vector_entry(entry):
+            # Vector path: expected_byte_sha256 is the contract
+            if entry.expected_byte_sha256 is None:
+                missing.append(f"{entry.name} (manifest has no expected_byte_sha256)")
+                continue
+            try:
+                raw_bytes = synthesize(entry)
+            except Exception as e:
+                schema_errors.append(f"{entry.name}: fetch/synthesis failed: {e}")
+                continue
+            if not isinstance(raw_bytes, (bytes, bytearray)):
+                schema_errors.append(
+                    f"{entry.name}: vector entry synthesize() returned {type(raw_bytes).__name__!r}, "
+                    f"expected bytes"
+                )
+                continue
+            actual_sha = hashlib.sha256(raw_bytes).hexdigest()
+            # Check the sha against the source sha stored in expected_byte_sha256["source"]
+            expected_sha = entry.expected_byte_sha256.get("source")
+            if expected_sha is None:
+                missing.append(
+                    f"{entry.name} (expected_byte_sha256 has no 'source' key — run build --seal)"
+                )
+                continue
+            if actual_sha != expected_sha:
+                mismatches.append(
+                    f"{entry.name}: expected source sha={expected_sha[:12]} "
+                    f"actual={actual_sha[:12]}"
+                )
+        else:
+            # Raster path: expected_pixel_sha256 is the contract
+            if entry.expected_pixel_sha256 is None:
+                missing.append(f"{entry.name} (manifest has no expected_pixel_sha256)")
+                continue
+            try:
+                image = synthesize(entry)
+            except Exception as e:
+                schema_errors.append(f"{entry.name}: synthesis failed: {e}")
+                continue
+            actual = pixel_sha256(image)
+            if actual != entry.expected_pixel_sha256:
+                mismatches.append(
+                    f"{entry.name}: expected={entry.expected_pixel_sha256[:12]} "
+                    f"actual={actual[:12]}"
+                )
 
     return VerifyResult(
         ok=not (mismatches or missing or schema_errors),

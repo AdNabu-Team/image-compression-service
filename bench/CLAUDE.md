@@ -26,21 +26,24 @@ The corpus has two named manifests that can be benchmarked independently or toge
 
 `MANIFEST_VERSION` was bumped from `1` to `2` in `bench/corpus/manifest.py`. `Manifest.from_json()` accepts both `{1, 2}`. v1 entries have no `source` field (`source=None` after loading). No structural changes to existing synthesized entries are required.
 
-A new `SourceSpec` dataclass was added with fields: `url`, `sha256`, `license`, `attribution`, `notes` (optional). A new `fetched_photo` content_kind is registered as a stub that raises `RuntimeError` if synthesis is accidentally invoked — the builder routes fetched entries through `fetch()` instead.
+A new `SourceSpec` dataclass was added with fields: `url`, `sha256`, `license`, `attribution`, `notes` (optional). Two stubs are registered: `fetched_photo` (raster) and `fetched_vector` (vector) — both raise `RuntimeError` if synthesis is accidentally invoked; the builder routes these through `fetch()` instead.
+
+A new `expected_byte_sha256` field (`dict[str, str] | None`) was added to `ManifestEntry` for vector entries. Raster entries leave this `None` and use `expected_pixel_sha256` as before. Vector entries leave `expected_pixel_sha256` as `None` and store `{"source": "<sha256>"}` in `expected_byte_sha256`.
 
 ## Subpackages
 
-- **`bench.corpus`** — manifest-driven corpus builder. Synthesizers produce deterministic pixel data from seeds; fetchers download hash-pinned real-world images. Manifests pin pixel-level SHA-256 (decoded `Image.tobytes()`), not encoded SHA — encoded bytes drift across libjpeg-turbo SIMD paths.
+- **`bench.corpus`** — manifest-driven corpus builder. Synthesizers produce deterministic pixel data from seeds; fetchers download hash-pinned real-world images. Raster manifests pin pixel-level SHA-256 (decoded `Image.tobytes()`); vector manifests (SVG/SVGZ) pin byte-level SHA-256 of the source file. Encoded raster bytes drift across libjpeg-turbo SIMD paths and are never the canonical hash; vector encoded bytes are deterministic (mtime=0 gzip) and can be hashed but the source SHA is the contract.
 - **`bench.corpus.fetchers`** — HTTP fetcher (`bench/corpus/fetchers/http.py`). Downloads to a content-addressed local cache (`bench/corpus/cache/`); verifies SHA-256 before returning the path. Exceptions: `FetchError`, `FetchIntegrityError`, `FetchHTTPError`, `FetchTooLargeError`. Default cache root overridable via `--cache PATH`.
 - **`bench.runner`** — subprocess-aware benchmark runner. Modes: `quick` (1 iter, smoke), `timing` (5 iter + warmup, p50/p95/p99 + MAD, `--isolate`), `memory` (1 iter, peak RSS headline). `load` mode deferred to v1.
 
 ## Determinism contract
 
-- Pixel-level SHA-256 of raw `Image.tobytes()` is canonical.
-- Encoded SHA may be recorded as `encoded_sha256.<platform>` for diagnostics, but is never blocking.
+- **Raster entries**: Pixel-level SHA-256 of raw `Image.tobytes()` is canonical (field `expected_pixel_sha256`). Encoded SHA may be recorded as `encoded_sha256.<platform>` for diagnostics, but is never blocking.
+- **Vector entries** (SVG/SVGZ): Byte-level SHA-256 of the raw source bytes is canonical (field `expected_byte_sha256["source"]`). SVG sources are XML; no pixel data exists. Encoded bytes are deterministic across platforms (no SIMD variance), so a flat `{format: sha256}` mapping suffices.
 - `random.Random(seed)` instances only — never mutate the global PRNG.
 - Fonts vendored at `bench/corpus/fonts/` (Pillow's default font is build-dependent).
-- Fetched entries: pixel hash is computed from the decoded source image (same `pixel_sha256()` function). The source URL's SHA-256 guards against corrupt downloads; the pixel SHA-256 guards against CDN re-encoding.
+- Fetched raster entries: pixel hash computed from decoded source image (same `pixel_sha256()` function). Source URL SHA-256 guards against corrupt downloads; pixel SHA-256 guards against CDN re-encoding.
+- Fetched vector entries (`fetched_vector` content_kind): source SHA-256 guards against corrupt downloads. The builder writes bytes directly to disk — no `Image.open()` is called.
 
 ## Common commands
 
