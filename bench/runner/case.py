@@ -80,24 +80,51 @@ def load_cases(
     bucket_filter: str | None = None,
     tag_filter: str | None = None,
     preset_filter: set[str] | None = None,
+    skip_missing: bool = True,
 ) -> list[Case]:
     """Build a list of Cases from a manifest and an on-disk corpus.
 
     Filters are applied additively. `preset_filter` defaults to all
-    three presets. Missing corpus files raise `CorpusFileMissing` —
-    fail fast rather than silently skip; an incomplete corpus is a
-    setup error.
+    three presets.
+
+    Missing-file handling depends on `skip_missing`:
+      - `True` (default): log a warning and skip cases whose encoded
+        file is absent. This is the right default in environments
+        where some formats are intentionally unavailable (e.g. JXL
+        in the production Docker image without libjxl, AVIF without
+        pillow_avif). The build step's `format_skipped` accounting
+        already records the gap; failing the runner on the same
+        gap would just double-report.
+      - `False`: raise `CorpusFileMissing` on the first absent file.
+        Useful for tests that want to guarantee a complete corpus.
     """
+    import logging
+
+    log = logging.getLogger(__name__)
     presets = preset_filter or set(DEFAULT_PRESETS)
     unknown = presets - PRESET_QUALITY.keys()
     if unknown:
         raise ValueError(f"unknown presets: {sorted(unknown)}")
 
     cases: list[Case] = []
+    skipped: list[str] = []
     for entry in manifest.filter(bucket=bucket_filter, tag=tag_filter):
         for fmt in entry.output_formats:
             if fmt_filter and fmt not in fmt_filter:
                 continue
             for preset in presets:
-                cases.append(_make_case(entry, fmt, preset, corpus_root))
+                try:
+                    cases.append(_make_case(entry, fmt, preset, corpus_root))
+                except CorpusFileMissing:
+                    if not skip_missing:
+                        raise
+                    skipped.append(f"{entry.name}.{fmt}@{preset}")
+    if skipped:
+        log.warning(
+            "load_cases skipped %d case(s) with missing corpus files "
+            "(format unavailable in this env): %s%s",
+            len(skipped),
+            ", ".join(skipped[:5]),
+            f", … (+{len(skipped) - 5} more)" if len(skipped) > 5 else "",
+        )
     return cases

@@ -120,12 +120,36 @@ def test_load_cases_rejects_unknown_preset(tmp_path: Path):
         load_cases(m, tmp_path, preset_filter={"hyper"})
 
 
-def test_load_cases_raises_when_corpus_file_missing(tmp_path: Path):
-    """If the corpus hasn't been built yet, fail fast with an actionable
-    message — silent skip would produce empty benchmarks."""
+def test_load_cases_skips_missing_by_default(tmp_path: Path):
+    """With skip_missing=True (default), missing files produce a warning
+    but the call still returns a (possibly empty) list."""
+    from bench.corpus.manifest import Bucket
+
+    m = Manifest(
+        name="t",
+        library_versions={},
+        entries=[
+            ManifestEntry(
+                name="absent",
+                bucket=Bucket.SMALL,
+                content_kind="photo_perlin",
+                seed=1,
+                width=64,
+                height=64,
+                output_formats=["jxl"],
+            ),
+        ],
+    )
+    cases = load_cases(m, tmp_path)
+    assert cases == []
+
+
+def test_load_cases_raises_when_corpus_file_missing_strict(tmp_path: Path):
+    """With skip_missing=False, an empty corpus raises with an actionable
+    message — for tests/scripts that want to enforce a complete build."""
     m = _manifest()
     with pytest.raises(CorpusFileMissing, match="Run `python -m bench.corpus build"):
-        load_cases(m, tmp_path)
+        load_cases(m, tmp_path, skip_missing=False)
 
 
 def test_case_load_returns_input_bytes(tmp_path: Path):
