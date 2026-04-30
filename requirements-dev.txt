@@ -3,3 +3,7 @@ pytest-cov>=4.0.0,<6.0.0
 pytest-asyncio>=0.23.0,<2.0.0
 black>=26.0.0,<27.0.0
 ruff>=0.4.0,<1.0.0
+
+# Bench corpus + runner deps. Used by `bench/` (not by the production
+# server). Synthesizers + pixel-hash + quality SSIM/PSNR all need numpy.
+numpy>=1.26.0,<3.0.0
