@@ -1,6 +1,6 @@
 """Command-line interface for `bench.run` and `bench.compare`.
 
-    python -m bench.run [--mode quick|timing|memory] [--manifest core] \\
+    python -m bench.run [--mode quick|timing|memory|accuracy] [--manifest core] \\
                         [--out reports/x.json] [--corpus PATH] \\
                         [--bucket B] [--fmt F] [--tag T] [--preset P] \\
                         [--repeat N] [--warmup N] [--seed N] [--no-shuffle] \\
@@ -20,6 +20,7 @@ from pathlib import Path
 from bench.corpus.cli import _load_manifest, _manifest_path
 from bench.runner.case import DEFAULT_PRESETS, load_cases
 from bench.runner.compare import compare, render_compare_markdown
+from bench.runner.modes.accuracy import run_accuracy_sync
 from bench.runner.modes.memory import run_memory_sync
 from bench.runner.modes.quick import run_quick_sync
 from bench.runner.modes.timing import run_timing_sync
@@ -70,6 +71,9 @@ def cmd_run(args: argparse.Namespace) -> int:
     elif args.mode == "memory":
         config = {"warmup": 0, "repeat": 1, "tracemalloc": True}
         iterations = run_memory_sync(cases)
+    elif args.mode == "accuracy":
+        config = {"warmup": 0, "repeat": 1, "stages": ["estimate", "optimize"]}
+        iterations = run_accuracy_sync(cases)
     else:  # timing
         config = {
             "warmup": args.warmup,
@@ -150,7 +154,9 @@ def build_parser() -> argparse.ArgumentParser:
     # Default subcommand: `run`. Allow `python -m bench.run --mode timing`
     # without an explicit `run` subcommand.
     p_run = sub.add_parser("run", help="execute a benchmark run")
-    p_run.add_argument("--mode", choices=("quick", "timing", "memory"), default="timing")
+    p_run.add_argument(
+        "--mode", choices=("quick", "timing", "memory", "accuracy"), default="timing"
+    )
     p_run.add_argument("--manifest", default="core")
     p_run.add_argument("--corpus", default=str(DEFAULT_CORPUS_ROOT))
     p_run.add_argument("--out", default="reports/bench.json")

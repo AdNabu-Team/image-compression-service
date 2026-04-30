@@ -151,12 +151,27 @@ def load_run(path: Path) -> dict[str, Any]:
     return raw
 
 
+def _is_failure(it: dict[str, Any]) -> bool:
+    """Return True if this iteration represents a run-time failure.
+
+    Quick/timing/memory modes store ``error`` as a plain string.
+    Accuracy mode stores its prediction-vs-actual metrics under
+    ``accuracy``, and reuses ``error`` (a ``{phase, message}`` dict) only
+    when estimate or optimize raised.  Either shape under ``error`` is a
+    failure; an absent ``error`` key is success.
+    """
+    err = it.get("error")
+    if err is None:
+        return False
+    return isinstance(err, (str, dict))
+
+
 def _roll_up_stats(iterations: list[dict[str, Any]]) -> list[CaseStats]:
     """Group iterations by case_id and produce one CaseStats per group."""
     by_case: dict[str, list[dict[str, Any]]] = {}
     case_meta: dict[str, dict[str, Any]] = {}
     for it in iterations:
-        if "error" in it:
+        if _is_failure(it):
             # Errored iterations don't contribute to stats; surfaced
             # separately in the report.
             continue

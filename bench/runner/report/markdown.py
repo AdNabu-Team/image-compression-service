@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from bench.runner.stats import CaseStats
+from bench.runner.stats import CaseStats, percentile
 
 _SPARK_CHARS = "▁▂▃▄▅▆▇█"
 
@@ -66,6 +66,32 @@ def _fmt_kb(v: int | None) -> str:
     return f"{v}KB"
 
 
+def _is_failure(it: dict[str, Any]) -> bool:
+    """Return True if this iteration represents a run-time failure.
+
+    A failure row has a top-level ``error`` field — either a string (legacy
+    quick/timing/memory shape) or a dict with ``phase`` (accuracy shape).
+    Successful accuracy rows carry their prediction-error metrics under
+    ``accuracy``, never ``error``.
+    """
+    err = it.get("error")
+    if err is None:
+        return False
+    return isinstance(err, (str, dict))
+
+
+def _failure_summary(it: dict[str, Any]) -> str:
+    """Return a short human-readable failure description."""
+    err = it.get("error")
+    if isinstance(err, str):
+        return err
+    if isinstance(err, dict):
+        phase = err.get("phase", "?")
+        msg = err.get("message", "unknown error")
+        return f"[{phase}] {msg}"
+    return repr(err)
+
+
 def render_run(run: dict[str, Any]) -> str:
     """Render a full run JSON payload as Markdown."""
     out: list[str] = []
@@ -74,14 +100,14 @@ def render_run(run: dict[str, Any]) -> str:
     out.append(_render_metadata(run))
     out.append("")
 
-    errors = [it for it in run["iterations"] if "error" in it]
-    if errors:
-        out.append(f"## Errors ({len(errors)})")
+    failures = [it for it in run["iterations"] if _is_failure(it)]
+    if failures:
+        out.append(f"## Errors ({len(failures)})")
         out.append("")
-        for e in errors[:10]:
-            out.append(f"- `{e['case_id']}`: {e['error']}")
-        if len(errors) > 10:
-            out.append(f"- … {len(errors) - 10} more")
+        for e in failures[:10]:
+            out.append(f"- `{e['case_id']}`: {_failure_summary(e)}")
+        if len(failures) > 10:
+            out.append(f"- … {len(failures) - 10} more")
         out.append("")
 
     stats = _stats_from_run(run)
@@ -98,6 +124,10 @@ def render_run(run: dict[str, Any]) -> str:
         out.append("## Memory headline (peak RSS — capacity planning)")
         out.append("")
         out.append(_render_memory_table(stats))
+
+    if run["mode"] == "accuracy":
+        out.append("")
+        out.append(_render_accuracy_summary(run["iterations"]))
 
     return "\n".join(out)
 
@@ -171,6 +201,92 @@ def _render_memory_table(stats: list[CaseStats]) -> str:
             f"| {_fmt_kb(s.py_peak_alloc_p95_kb)} "
             f"| {curve_summary} | `{spark}` |"
         )
+    return "\n".join(lines)
+
+
+def _render_accuracy_summary(iterations: list[dict[str, Any]]) -> str:
+    """Render an accuracy-summary section for accuracy-mode runs.
+
+    Aggregates reduction_abs_error_pct_abs and size_rel_error_pct across
+    all successful cases, then breaks down median error per output format.
+    Only called when ``run['mode'] == 'accuracy'``.
+    """
+    # Collect per-case error metrics from successful (non-failure) rows.
+    red_abs_errs: list[float] = []
+    size_rel_errs: list[float] = []
+    by_fmt: dict[str, list[float]] = {}
+    no_op_correct = 0
+    no_op_total = 0
+
+    for it in iterations:
+        if _is_failure(it):
+            continue
+        acc = it.get("accuracy")
+        if not isinstance(acc, dict):
+            continue
+        red_abs = acc.get("reduction_abs_error_pct_abs")
+        size_rel = acc.get("size_rel_error_pct")
+        if red_abs is None or size_rel is None:
+            continue
+        red_abs_errs.append(float(red_abs))
+        size_rel_errs.append(abs(float(size_rel)))
+        fmt = it.get("format", "?")
+        by_fmt.setdefault(fmt, []).append(float(red_abs))
+
+        # Check if already_optimized prediction matched actual < 1% reduction
+        est = it.get("estimate", {})
+        opt = it.get("optimize", {})
+        predicted_already_opt = est.get("already_optimized", False)
+        actual_reduction = opt.get("actual_reduction_pct", 0.0)
+        actual_no_op = actual_reduction < 1.0
+        if predicted_already_opt:
+            no_op_total += 1
+            if actual_no_op:
+                no_op_correct += 1
+
+    if not red_abs_errs:
+        return "## Accuracy summary\n\n_No accuracy data available._"
+
+    lines: list[str] = []
+    lines.append("## Accuracy summary")
+    lines.append("")
+    lines.append(
+        f"_{len(red_abs_errs)} successful case(s) measured. "
+        f"Positive size_rel_error = estimator overestimates (predicted size > actual)._"
+    )
+    lines.append("")
+
+    # Overall aggregates
+    med_red = percentile(red_abs_errs, 50)
+    p95_red = percentile(red_abs_errs, 95)
+    med_size = percentile(size_rel_errs, 50)
+    p95_size = percentile(size_rel_errs, 95)
+    lines.append("### Overall error")
+    lines.append("")
+    lines.append("| metric | median | p95 |")
+    lines.append("|---|---|---|")
+    lines.append(f"| `reduction_abs_error_pct_abs` | {med_red:.2f}% | {p95_red:.2f}% |")
+    lines.append(f"| `abs(size_rel_error_pct)` | {med_size:.2f}% | {p95_size:.2f}% |")
+    lines.append("")
+
+    # No-op identification accuracy
+    if no_op_total > 0:
+        lines.append(
+            f"**No-op identification**: {no_op_correct}/{no_op_total} cases where "
+            f"`already_optimized=true` correctly matched `actual_reduction_pct < 1.0`"
+        )
+        lines.append("")
+
+    # Per-format breakdown
+    lines.append("### Per-format median `reduction_abs_error_pct_abs`")
+    lines.append("")
+    lines.append("| format | n | median abs error |")
+    lines.append("|---|---|---|")
+    for fmt in sorted(by_fmt.keys()):
+        vals = by_fmt[fmt]
+        med = percentile(vals, 50)
+        lines.append(f"| {fmt} | {len(vals)} | {med:.2f}% |")
+
     return "\n".join(lines)
 
 
