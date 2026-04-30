@@ -207,6 +207,75 @@ def test_peak_rss_takes_max_of_parent_and_children():
     assert m.peak_rss_kb == 300
 
 
+def test_rss_curve_collects_samples_when_enabled():
+    """Memory mode opts in to a 50 ms-cadence RSS curve via psutil."""
+    from bench.runner.measure import measure as _measure
+
+    with _measure(track_rss_curve=True, rss_sample_interval_ms=20) as m:
+        # Run for ~120ms so we get >=4 samples at 20ms cadence.
+        time.sleep(0.12)
+
+    assert len(m.rss_samples) >= 3, f"got {len(m.rss_samples)} samples"
+    for offset_ms, rss_kb in m.rss_samples:
+        assert offset_ms >= 0
+        assert rss_kb > 0
+
+
+def test_rss_curve_off_by_default():
+    """Default measure() does not spawn a sampler thread or collect samples."""
+    with measure() as m:
+        time.sleep(0.05)
+    assert m.rss_samples == []
+
+
+def test_rss_curve_includes_subprocess_rss():
+    """Curve sums parent + children RSS, so a memory-hungry subprocess
+    should bump the values during its lifetime."""
+    import subprocess
+    import sys
+
+    # Allocate ~50 MB in the child and hold it for ~150ms.
+    hog = (
+        "import time\n"
+        "buf = bytearray(50 * 1024 * 1024)\n"
+        "for i in range(len(buf)):\n"
+        "    if i % 4096 == 0:\n"
+        "        buf[i] = 1\n"
+        "time.sleep(0.15)\n"
+    )
+    with measure(track_rss_curve=True, rss_sample_interval_ms=20) as m:
+        proc = subprocess.Popen([sys.executable, "-c", hog])
+        time.sleep(0.18)
+        proc.wait()
+
+    assert m.rss_samples
+    peak_kb = max(s[1] for s in m.rss_samples)
+    # Expect at least 30 MB above the bare parent. The child was ~50 MB,
+    # but psutil sampling can miss the exact peak — so be lenient.
+    parent_baseline_kb = m.rss_samples[0][1]
+    assert peak_kb - parent_baseline_kb > 30 * 1024, (
+        f"expected child to inflate curve by >30MB, got "
+        f"baseline={parent_baseline_kb}KB peak={peak_kb}KB"
+    )
+
+
+def test_rss_curve_warns_when_psutil_missing(monkeypatch):
+    """If psutil isn't installed, the flag is a warn-and-no-op rather
+    than a hard failure."""
+    import warnings as _warnings
+
+    from bench.runner import measure as measure_module
+
+    monkeypatch.setattr(measure_module, "_PSUTIL_AVAILABLE", False)
+
+    with _warnings.catch_warnings(record=True) as caught:
+        _warnings.simplefilter("always")
+        with measure(track_rss_curve=True) as m:
+            time.sleep(0.01)
+    assert m.rss_samples == []
+    assert any("psutil" in str(w.message) for w in caught)
+
+
 def test_two_nested_measure_blocks_do_not_leak_phases():
     """Phase recorder is per-context; nested measures stay independent."""
     with measure() as outer:

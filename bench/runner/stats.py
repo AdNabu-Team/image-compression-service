@@ -187,6 +187,9 @@ class CaseStats:
     method: str = ""
     py_peak_alloc_p95_kb: int | None = None
     raw_wall_ms: list[float] = field(default_factory=list)
+    # First iteration's psutil RSS curve, if memory mode collected one.
+    # Each entry is [offset_ms, total_rss_kb]. Empty in timing/quick modes.
+    rss_samples: list[list[float]] = field(default_factory=list)
 
 
 def summarize_iterations(
@@ -215,6 +218,11 @@ def summarize_iterations(
     parallelisms = [it["parallelism"] for it in iter_data]
     py_alloc = [it.get("py_peak_alloc_kb") for it in iter_data]
     py_alloc_present = [v for v in py_alloc if v is not None]
+    # Pick the first iteration's RSS samples for visualization; later
+    # iterations are statistically redundant for a curve and would just
+    # bloat the JSON.
+    first_samples = iter_data[0].get("rss_samples") or []
+    rss_samples = [list(pt) for pt in first_samples]
 
     return CaseStats(
         case_id=case_id,
@@ -236,6 +244,7 @@ def summarize_iterations(
         children_peak_rss_p95_kb=int(percentile(child_rss, 95)),
         parent_peak_rss_p95_kb=int(percentile(parent_rss, 95)),
         parallelism_p50=percentile(parallelisms, 50),
+        rss_samples=rss_samples,
         reduction_pct=reduction_pct,
         method=method,
         py_peak_alloc_p95_kb=int(percentile(py_alloc_present, 95)) if py_alloc_present else None,

@@ -11,6 +11,40 @@ from typing import Any
 
 from bench.runner.stats import CaseStats
 
+_SPARK_CHARS = "▁▂▃▄▅▆▇█"
+
+
+def _sparkline(samples: list, max_buckets: int = 24) -> str:
+    """Compress an RSS sample series into a unicode sparkline.
+
+    Each sample is `[offset_ms, rss_kb]`. We drop the time axis and bucket
+    by max-rss so a single ASCII glyph reflects the worst case in its
+    window — that matches what readers want to see at a glance.
+    """
+    if not samples:
+        return ""
+    values = [s[1] for s in samples if isinstance(s, (list, tuple)) and len(s) >= 2]
+    if not values:
+        return ""
+    if len(values) > max_buckets:
+        # Fold to max_buckets via max-pooling.
+        bucket_size = len(values) / max_buckets
+        bucketed: list[float] = []
+        for i in range(max_buckets):
+            start = int(i * bucket_size)
+            end = max(start + 1, int((i + 1) * bucket_size))
+            bucketed.append(max(values[start:end]))
+        values = bucketed
+    lo, hi = min(values), max(values)
+    if hi == lo:
+        return _SPARK_CHARS[len(_SPARK_CHARS) // 2] * len(values)
+    return "".join(
+        _SPARK_CHARS[
+            min(len(_SPARK_CHARS) - 1, int((v - lo) / (hi - lo) * (len(_SPARK_CHARS) - 1)))
+        ]
+        for v in values
+    )
+
 
 def _fmt_ms(v: float) -> str:
     if v >= 1000:
@@ -117,16 +151,25 @@ def _render_stats_table(stats: list[CaseStats]) -> str:
 
 def _render_memory_table(stats: list[CaseStats]) -> str:
     lines = [
-        "| case_id | parent peak | children peak | py heap peak |",
-        "|---|---|---|---|",
+        "| case_id | parent peak | children peak | py heap peak | curve peak (samples) | spark |",
+        "|---|---|---|---|---|---|",
     ]
     for s in sorted(
         stats, key=lambda x: -max(x.parent_peak_rss_p95_kb, x.children_peak_rss_p95_kb)
     ):
+        samples = s.rss_samples or []
+        if samples:
+            sample_peak_kb = max(int(pt[1]) for pt in samples)
+            curve_summary = f"{_fmt_kb(sample_peak_kb)} ({len(samples)})"
+            spark = _sparkline(samples)
+        else:
+            curve_summary = "-"
+            spark = "-"
         lines.append(
             f"| `{s.case_id}` | {_fmt_kb(s.parent_peak_rss_p95_kb)} "
             f"| {_fmt_kb(s.children_peak_rss_p95_kb)} "
-            f"| {_fmt_kb(s.py_peak_alloc_p95_kb)} |"
+            f"| {_fmt_kb(s.py_peak_alloc_p95_kb)} "
+            f"| {curve_summary} | `{spark}` |"
         )
     return "\n".join(lines)
 

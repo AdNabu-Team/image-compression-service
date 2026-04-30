@@ -176,6 +176,7 @@ def _roll_up_stats(iterations: list[dict[str, Any]]) -> list[CaseStats]:
                 "parent_peak_rss_kb": m["parent_peak_rss_kb"],
                 "parallelism": m["parallelism"],
                 "py_peak_alloc_kb": m.get("py_peak_alloc_kb"),
+                "rss_samples": m.get("rss_samples") or [],
             }
             for m in ms
         ]

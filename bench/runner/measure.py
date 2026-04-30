@@ -31,11 +31,20 @@ import contextvars
 import gc
 import platform
 import resource
+import threading
 import time
 import tracemalloc
+import warnings
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Iterator
+
+try:
+    import psutil
+
+    _PSUTIL_AVAILABLE = True
+except ImportError:
+    _PSUTIL_AVAILABLE = False
 
 # Per-context phase recorder. `phase()` writes into this dict while a
 # `measure()` block holds the contextvar; outside that block the var is
@@ -74,6 +83,14 @@ class Measurement:
     # inside the measured block.
     phases: dict[str, float] = field(default_factory=dict)
 
+    # Set only when `track_rss_curve=True`. Each tuple is
+    # (offset_ms, total_rss_kb) where total_rss_kb sums the parent and
+    # all live children at sample time. The canonical peak still comes
+    # from `RUSAGE_*.ru_maxrss` (sample-rate-independent). The curve is
+    # for visualization only — it can miss peaks for sub-50ms subprocess
+    # bursts.
+    rss_samples: list[tuple[float, int]] = field(default_factory=list)
+
     @property
     def total_cpu_ms(self) -> float:
         return (
@@ -106,16 +123,94 @@ def _maxrss_to_kb(maxrss: int) -> int:
     return maxrss
 
 
+class _RSSSampler:
+    """Background thread that polls parent + children RSS at fixed cadence.
+
+    Polls `psutil.Process(self).memory_info().rss` plus all live children
+    (recursive), summing them at each sample. Samples land in
+    `Measurement.rss_samples` for visualization. Sample-rate-bound: a
+    subprocess that lives <interval_ms can be missed entirely. Use
+    `getrusage`-derived peak as the canonical capacity number.
+    """
+
+    def __init__(self, interval_ms: int = 50):
+        if not _PSUTIL_AVAILABLE:
+            raise RuntimeError("psutil not installed")
+        self._interval_s = interval_ms / 1000.0
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._t0_ns = 0
+        self.samples: list[tuple[float, int]] = []
+
+    def start(self) -> None:
+        self._t0_ns = time.perf_counter_ns()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=1.0)
+
+    def _run(self) -> None:
+        try:
+            proc = psutil.Process()
+        except psutil.Error:
+            return
+        # Take an initial sample so very short windows still produce data.
+        self._take_sample(proc)
+        while not self._stop.is_set():
+            if self._stop.wait(self._interval_s):
+                break
+            self._take_sample(proc)
+
+    def _take_sample(self, proc: "psutil.Process") -> None:
+        try:
+            rss = proc.memory_info().rss
+        except psutil.Error:
+            return
+        try:
+            for child in proc.children(recursive=True):
+                try:
+                    rss += child.memory_info().rss
+                except psutil.Error:
+                    continue
+        except psutil.Error:
+            pass
+        t_ms = (time.perf_counter_ns() - self._t0_ns) / 1e6
+        self.samples.append((t_ms, rss // 1024))
+
+
 @contextmanager
-def measure(*, track_python_allocs: bool = False) -> Iterator[Measurement]:
+def measure(
+    *,
+    track_python_allocs: bool = False,
+    track_rss_curve: bool = False,
+    rss_sample_interval_ms: int = 50,
+) -> Iterator[Measurement]:
     """Wrap a block of work; populate a `Measurement` on exit.
 
     GC is collected once before the timer starts and disabled inside the
     block to keep collection-related noise out of the measurement. It is
     re-enabled in `finally` so an exception cannot leave the interpreter
     in a no-GC state.
+
+    `track_rss_curve` spawns a background thread polling parent +
+    children RSS for visualization. Adds modest CPU overhead (~1-2 %)
+    and small memory churn from the sampler list, so leave off for
+    timing mode.
     """
     m = Measurement()
+
+    sampler: _RSSSampler | None = None
+    if track_rss_curve:
+        if not _PSUTIL_AVAILABLE:
+            warnings.warn(
+                "track_rss_curve requested but psutil is not installed; skipping",
+                stacklevel=2,
+            )
+        else:
+            sampler = _RSSSampler(interval_ms=rss_sample_interval_ms)
 
     if track_python_allocs:
         tracemalloc.start()
@@ -128,12 +223,17 @@ def measure(*, track_python_allocs: bool = False) -> Iterator[Measurement]:
     ru0_self = resource.getrusage(resource.RUSAGE_SELF)
     ru0_children = resource.getrusage(resource.RUSAGE_CHILDREN)
     token = _phase_recorder.set(m.phases)
+    if sampler is not None:
+        sampler.start()
     t0 = time.perf_counter_ns()
 
     try:
         yield m
     finally:
         t1 = time.perf_counter_ns()
+        if sampler is not None:
+            sampler.stop()
+            m.rss_samples = list(sampler.samples)
         ru1_children = resource.getrusage(resource.RUSAGE_CHILDREN)
         ru1_self = resource.getrusage(resource.RUSAGE_SELF)
         _phase_recorder.reset(token)

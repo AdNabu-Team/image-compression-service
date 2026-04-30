@@ -35,14 +35,24 @@ def measurement_to_dict(m: Measurement) -> dict[str, Any]:
         "peak_rss_kb": m.peak_rss_kb,
         "py_peak_alloc_kb": m.py_peak_alloc_kb,
         "phases": dict(m.phases),
+        # Memory-mode visualization. Empty unless `track_rss_curve=True`.
+        "rss_samples": [list(s) for s in m.rss_samples],
     }
 
 
-async def _run_one_case(case: Case, *, track_python_allocs: bool = False) -> dict[str, Any]:
+async def _run_one_case(
+    case: Case,
+    *,
+    track_python_allocs: bool = False,
+    track_rss_curve: bool = False,
+) -> dict[str, Any]:
     input_data = case.load()
     config = OptimizationConfig(quality=case.quality)
 
-    with measure(track_python_allocs=track_python_allocs) as m:
+    with measure(
+        track_python_allocs=track_python_allocs,
+        track_rss_curve=track_rss_curve,
+    ) as m:
         with collect_tool_invocations() as invocations:
             result = await optimize_image(input_data, config)
 
@@ -69,6 +79,7 @@ async def run_quick(
     cases: list[Case],
     *,
     track_python_allocs: bool = False,
+    track_rss_curve: bool = False,
 ) -> list[dict[str, Any]]:
     """Sequentially run one iteration per case.
 
@@ -79,7 +90,11 @@ async def run_quick(
     results: list[dict[str, Any]] = []
     for case in cases:
         try:
-            result = await _run_one_case(case, track_python_allocs=track_python_allocs)
+            result = await _run_one_case(
+                case,
+                track_python_allocs=track_python_allocs,
+                track_rss_curve=track_rss_curve,
+            )
             results.append(result)
         except Exception as e:
             logger.warning("case %s failed: %s", case.case_id, e)
@@ -101,6 +116,13 @@ def run_quick_sync(
     cases: list[Case],
     *,
     track_python_allocs: bool = False,
+    track_rss_curve: bool = False,
 ) -> list[dict[str, Any]]:
     """Synchronous wrapper for use from `bench.runner.cli`."""
-    return asyncio.run(run_quick(cases, track_python_allocs=track_python_allocs))
+    return asyncio.run(
+        run_quick(
+            cases,
+            track_python_allocs=track_python_allocs,
+            track_rss_curve=track_rss_curve,
+        )
+    )
