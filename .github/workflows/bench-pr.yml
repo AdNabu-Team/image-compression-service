@@ -45,16 +45,16 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build corpus + run quick mode in container
-        # numpy is a dev-only dep (bench synthesizers + pixel-hashing); the
-        # production image deliberately omits it. Install at runtime so the
-        # production image stays lean.
+        # Bench-only deps (numpy, psutil) live in requirements-bench.txt and
+        # are deliberately NOT in the production image. Install at runtime so
+        # the production image stays lean.
         run: |
           mkdir -p reports
           docker run --rm \
             -v "$(pwd):/work" \
             -w /work \
             pare:pr-${{ github.run_id }} \
-            bash -c "pip install --no-cache-dir 'numpy>=1.26.0,<3.0.0' && \
+            bash -c "pip install --no-cache-dir -r requirements-bench.txt && \
                      python -m bench.corpus build --manifest core && \
                      python -m bench.run --mode quick --manifest core \
                        --annotate ci=github \
