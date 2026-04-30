@@ -53,6 +53,10 @@ python -m bench.run --mode quick --manifest core \
   --annotate "env=local-venv-bootstrap" --out reports/baseline.core.json
 # See .github/workflows/bench-pr.yml — PRs auto-compare against this baseline
 
+# Build the bench dashboard locally (deploys to GitHub Pages on main push)
+python -m bench.dashboard.build --out-dir /tmp/dash
+# Dashboard URL: https://amitray007.github.io/pare/
+
 # Docker
 docker-compose up          # Pare + Redis (local dev)
 docker build -t pare .     # Full build with jpegli, MozJPEG, JXL tools

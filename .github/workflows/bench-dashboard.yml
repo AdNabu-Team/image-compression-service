@@ -1,0 +1,44 @@
+name: bench-dashboard
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'reports/baseline.core.json'
+      - 'bench/dashboard/**'
+      - '.github/workflows/bench-dashboard.yml'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: bench-dashboard
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # need full history for git log --follow
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build dashboard
+        run: python -m bench.dashboard.build --out-dir dashboard/dist
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dashboard/dist
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

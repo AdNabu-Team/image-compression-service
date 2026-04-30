@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pare bench dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --border: #2a2d3a;
+      --text: #e2e8f0;
+      --muted: #8892a4;
+      --accent: #6366f1;
+      --accent2: #f59e0b;
+      --accent3: #10b981;
+      --danger: #ef4444;
+      --radius: 8px;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 24px 16px 48px;
+    }
+
+    header {
+      max-width: 1100px;
+      margin: 0 auto 28px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+    }
+
+    header h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+
+    header h1 span { color: var(--accent); }
+
+    .meta {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-left: auto;
+    }
+
+    .main {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar label { font-size: 0.82rem; color: var(--muted); }
+
+    .toolbar select {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 5px 10px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .toolbar select:focus { border-color: var(--accent); }
+
+    .charts {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+    }
+
+    .card h2 {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 14px;
+    }
+
+    .chart-wrap { position: relative; height: 220px; }
+
+    /* Recent runs table */
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.80rem;
+    }
+
+    th {
+      text-align: left;
+      color: var(--muted);
+      font-weight: 600;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    tr:hover td { background: rgba(255,255,255,0.03); }
+
+    .sha {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.78rem;
+      color: var(--accent);
+    }
+
+    .err { color: var(--danger); }
+
+    .empty {
+      color: var(--muted);
+      font-style: italic;
+      padding: 40px 0;
+      text-align: center;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 0.70rem;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: rgba(99,102,241,0.15);
+      color: var(--accent);
+      border: 1px solid rgba(99,102,241,0.3);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Pare <span>bench</span> dashboard</h1>
+  <div class="meta" id="header-meta">Loading…</div>
+</header>
+
+<div class="main">
+
+  <div class="toolbar">
+    <label for="fmt-select">Format:</label>
+    <select id="fmt-select">
+      <option value="all">all</option>
+    </select>
+  </div>
+
+  <div class="charts">
+    <div class="card">
+      <h2>p50 wall-time (ms)</h2>
+      <div class="chart-wrap"><canvas id="chart-p50"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>p95 wall-time (ms)</h2>
+      <div class="chart-wrap"><canvas id="chart-p95"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>peak RSS (KB, parent + children)</h2>
+      <div class="chart-wrap"><canvas id="chart-rss"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Recent runs</h2>
+    <div class="table-wrap">
+      <table id="runs-table">
+        <thead>
+          <tr>
+            <th>SHA</th>
+            <th>Date</th>
+            <th>Subject</th>
+            <th>Cases</th>
+            <th>Errors</th>
+          </tr>
+        </thead>
+        <tbody id="runs-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* -----------------------------------------------------------------------
+   Palette — one distinct color per format
+----------------------------------------------------------------------- */
+const PALETTE = [
+  "#6366f1", "#f59e0b", "#10b981", "#3b82f6", "#ec4899",
+  "#8b5cf6", "#14b8a6", "#f97316", "#a3e635", "#e879f9",
+  "#fb7185", "#38bdf8",
+];
+
+/* -----------------------------------------------------------------------
+   Chart.js shared defaults
+----------------------------------------------------------------------- */
+Chart.defaults.color = "#8892a4";
+Chart.defaults.borderColor = "#2a2d3a";
+Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace';
+Chart.defaults.font.size = 11;
+
+function makeChart(id, label) {
+  const ctx = document.getElementById(id).getContext("2d");
+  return new Chart(ctx, {
+    type: "line",
+    data: { labels: [], datasets: [] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: {
+          position: "bottom",
+          labels: { boxWidth: 10, padding: 14, usePointStyle: true, pointStyle: "circle" },
+        },
+        tooltip: {
+          backgroundColor: "#1a1d27",
+          borderColor: "#2a2d3a",
+          borderWidth: 1,
+          titleColor: "#e2e8f0",
+          bodyColor: "#8892a4",
+          padding: 10,
+          callbacks: {
+            label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) : "–"}`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          ticks: { maxRotation: 45, autoSkip: true, maxTicksLimit: 12 },
+          grid: { color: "#1f2232" },
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: "#1f2232" },
+        },
+      },
+    },
+  });
+}
+
+/* -----------------------------------------------------------------------
+   Main
+----------------------------------------------------------------------- */
+let HISTORY = null;
+let CHARTS = {};
+let ACTIVE_FMT = "all";
+
+async function loadData() {
+  const resp = await fetch("data/history.json");
+  if (!resp.ok) throw new Error("Failed to fetch data/history.json: " + resp.status);
+  return resp.json();
+}
+
+function allFormats(runs) {
+  const fmts = new Set();
+  for (const r of runs) {
+    for (const f of Object.keys(r.by_format || {})) fmts.add(f);
+  }
+  return Array.from(fmts).sort();
+}
+
+function buildDatasets(runs, metric, fmts) {
+  return fmts.map((fmt, i) => ({
+    label: fmt,
+    data: runs.map((r) => {
+      const bf = r.by_format || {};
+      return bf[fmt] != null ? bf[fmt][metric] : null;
+    }),
+    borderColor: PALETTE[i % PALETTE.length],
+    backgroundColor: PALETTE[i % PALETTE.length] + "22",
+    borderWidth: 2,
+    pointRadius: runs.length <= 5 ? 4 : 2,
+    pointHoverRadius: 5,
+    tension: 0.3,
+    fill: false,
+    spanGaps: true,
+  }));
+}
+
+function formatMedianOf(runs, fmt, metric) {
+  // For "all": take median across all formats in the latest run.
+  const latest = runs[runs.length - 1];
+  if (!latest) return "–";
+  const bf = latest.by_format || {};
+  const vals = Object.values(bf).map((v) => v[metric]).filter((v) => v != null);
+  if (!vals.length) return "–";
+  const sorted = [...vals].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? ((sorted[mid - 1] + sorted[mid]) / 2).toFixed(1)
+    : sorted[mid].toFixed(1);
+}
+
+function updateCharts(runs, fmts) {
+  const labels = runs.map((r) => `${r.short_sha} ${r.iso_date}`);
+
+  const p50ds = buildDatasets(runs, "p50_ms", fmts);
+  const p95ds = buildDatasets(runs, "p95_ms", fmts);
+  const rssds = buildDatasets(runs, "peak_rss_kb", fmts);
+
+  function refreshChart(chart, datasets) {
+    chart.data.labels = labels;
+    chart.data.datasets = datasets;
+    chart.update("none");
+  }
+
+  refreshChart(CHARTS.p50, p50ds);
+  refreshChart(CHARTS.p95, p95ds);
+  refreshChart(CHARTS.rss, rssds);
+}
+
+function filteredRuns(runs, fmt) {
+  if (fmt === "all") return runs;
+  return runs.filter((r) => (r.by_format || {})[fmt] != null);
+}
+
+function filteredFmts(allFmts, fmt) {
+  if (fmt === "all") return allFmts;
+  return allFmts.includes(fmt) ? [fmt] : [];
+}
+
+function renderTable(runs) {
+  const tbody = document.getElementById("runs-tbody");
+  tbody.innerHTML = "";
+  const recent = [...runs].reverse().slice(0, 20);
+  if (!recent.length) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 5;
+    td.className = "empty";
+    td.textContent = "No runs yet";
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    return;
+  }
+  for (const r of recent) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><span class="sha">${r.short_sha}</span></td>
+      <td>${r.iso_date}</td>
+      <td>${escHtml(r.subject)}</td>
+      <td>${r.n_cases}</td>
+      <td class="${r.n_errors > 0 ? "err" : ""}">${r.n_errors || 0}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function init(history) {
+  HISTORY = history;
+
+  // Header meta
+  const meta = document.getElementById("header-meta");
+  const runCount = (history.runs || []).length;
+  meta.textContent = `generated ${history.generated_at} · main@${history.latest_sha} · ${runCount} run${runCount !== 1 ? "s" : ""}`;
+
+  // Populate format dropdown
+  const sel = document.getElementById("fmt-select");
+  const fmts = allFormats(history.runs || []);
+  for (const f of fmts) {
+    const opt = document.createElement("option");
+    opt.value = f;
+    opt.textContent = f;
+    sel.appendChild(opt);
+  }
+  sel.addEventListener("change", () => {
+    ACTIVE_FMT = sel.value;
+    redraw();
+  });
+
+  // Build charts
+  CHARTS.p50 = makeChart("chart-p50", "p50_ms");
+  CHARTS.p95 = makeChart("chart-p95", "p95_ms");
+  CHARTS.rss = makeChart("chart-rss", "peak_rss_kb");
+
+  redraw();
+}
+
+function redraw() {
+  const runs = filteredRuns(HISTORY.runs || [], ACTIVE_FMT);
+  const fmts = filteredFmts(allFormats(HISTORY.runs || []), ACTIVE_FMT);
+  updateCharts(runs, fmts);
+  renderTable(runs);
+}
+
+(async () => {
+  try {
+    const history = await loadData();
+    init(history);
+  } catch (err) {
+    document.getElementById("header-meta").textContent = "Error loading data: " + err.message;
+    console.error(err);
+  }
+})();
+</script>
+
+</body>
+</html>

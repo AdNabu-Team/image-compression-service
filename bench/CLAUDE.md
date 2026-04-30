@@ -128,6 +128,22 @@ git commit -m "chore(bench): refresh baseline.core.json"
 
 Refresh the baseline whenever you intentionally change optimizer behavior, add corpus entries, or when you want to adopt the Docker-built numbers as the new reference (run the CI workflow on a clean branch, pull `reports/_head.json` from the artifact, rename it, and commit).
 
+## Dashboard
+
+The bench dashboard at `https://amitray007.github.io/pare/` shows per-format timing/RSS trends
+across the git history of `reports/baseline.core.json`. Regenerated on every main merge that
+touches the baseline. Source: `bench/dashboard/build.py`.
+
+The dashboard is purely informational — it doesn't gate any CI; for that, use `bench-pr.yml`.
+
+```bash
+# Build the dashboard locally
+python -m bench.dashboard.build --out-dir /tmp/dash
+# Inspect output
+ls /tmp/dash                          # index.html, data/history.json
+python -c "import json; d=json.loads(open('/tmp/dash/data/history.json').read()); print('runs:', len(d['runs']))"
+```
+
 ## Code style
 
 Same as repo root: Black 100 cols, Ruff E/F/W/I, Python 3.12, pytest-asyncio.
