@@ -20,6 +20,7 @@ from bench.corpus.manifest import ManifestEntry, Synthesized
 from bench.corpus.synthesis import (  # noqa: F401, E402
     animated,
     deep_color,
+    fetched,
     graphic,
     pathological,
     photo,

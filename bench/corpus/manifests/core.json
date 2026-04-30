@@ -1,7 +1,11 @@
 {
   "manifest_version": 1,
   "manifest_name": "core",
-  "library_versions": {},
+  "library_versions": {
+    "Pillow": "10.4.0",
+    "numpy": "2.4.4",
+    "pillow_heif": "0.22.0"
+  },
   "entries": [
     {
       "name": "photo_noise_small_png",
@@ -10,8 +14,14 @@
       "seed": 1,
       "width": 192,
       "height": 144,
-      "output_formats": ["png"],
-      "tags": ["photo", "worst_case"]
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "worst_case"
+      ],
+      "expected_pixel_sha256": "09f2467875f3a2bc08b896708365ebeafa4a3b8de4296f305ec1c88ed31386e7"
     },
     {
       "name": "photo_perlin_small_png",
@@ -20,8 +30,13 @@
       "seed": 2,
       "width": 256,
       "height": 192,
-      "output_formats": ["png"],
-      "tags": ["photo"]
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "b1bb186e6180847410f852c57e2328e4a33e1bed1119d9a548769efb6dfc3188"
     },
     {
       "name": "photo_perlin_medium_png",
@@ -30,8 +45,13 @@
       "seed": 3,
       "width": 768,
       "height": 576,
-      "output_formats": ["png"],
-      "tags": ["photo"]
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "a2afff5745c81686c03f04cce258b4e5c664687e111bcfdf8bf4ed0be24436e5"
     },
     {
       "name": "photo_perlin_small_jpeg",
@@ -40,8 +60,13 @@
       "seed": 4,
       "width": 1024,
       "height": 768,
-      "output_formats": ["jpeg"],
-      "tags": ["photo"]
+      "output_formats": [
+        "jpeg"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "d798642456a817b19562da01259b3ac86aa618a928be5d55bfc4f11e278e5d1c"
     },
     {
       "name": "photo_perlin_medium_jpeg",
@@ -50,8 +75,13 @@
       "seed": 5,
       "width": 2400,
       "height": 1800,
-      "output_formats": ["jpeg"],
-      "tags": ["photo"]
+      "output_formats": [
+        "jpeg"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "bb9ce2738313488c96a2365a3019dcc1cdfbfa321ba59a68b4ad7bf8fc02c66b"
     },
     {
       "name": "photo_perlin_small_webp",
@@ -60,8 +90,13 @@
       "seed": 6,
       "width": 1024,
       "height": 768,
-      "output_formats": ["webp"],
-      "tags": ["photo"]
+      "output_formats": [
+        "webp"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "0671c0970586c33d6a142a3a564881139250e478fc042cb705530bf474578aa1"
     },
     {
       "name": "graphic_palette_small_png",
@@ -70,8 +105,14 @@
       "seed": 7,
       "width": 512,
       "height": 384,
-      "output_formats": ["png"],
-      "tags": ["graphic", "palette"]
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "graphic",
+        "palette"
+      ],
+      "expected_pixel_sha256": "8fb7eafe9f438c0528f16fd438ede32225e7027ea305a53845d3f5e09648b874"
     },
     {
       "name": "graphic_geometric_small_webp",
@@ -80,8 +121,13 @@
       "seed": 8,
       "width": 1024,
       "height": 768,
-      "output_formats": ["webp"],
-      "tags": ["graphic"]
+      "output_formats": [
+        "webp"
+      ],
+      "tags": [
+        "graphic"
+      ],
+      "expected_pixel_sha256": "ab4fdd48cc6024bd6fe7a1d09b09ae5fdd747d18871f30010e0d52c106a95b26"
     },
     {
       "name": "transparent_overlay_small_png",
@@ -90,8 +136,13 @@
       "seed": 9,
       "width": 192,
       "height": 144,
-      "output_formats": ["png"],
-      "tags": ["transparent"]
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "transparent"
+      ],
+      "expected_pixel_sha256": "8ae754b94947124db225953e443e0db6f81d59e70f040218f676809674fc36a5"
     },
     {
       "name": "text_screenshot_small_png",
@@ -100,8 +151,13 @@
       "seed": 10,
       "width": 384,
       "height": 288,
-      "output_formats": ["png"],
-      "tags": ["text"]
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "text"
+      ],
+      "expected_pixel_sha256": "4bd6ffaf41fd98d33e51428a7084ab53e7fa875d6ea30d6576e7d40f5a849dd9"
     },
     {
       "name": "path_thin_gradient_small_jpeg",
@@ -110,8 +166,14 @@
       "seed": 0,
       "width": 1024,
       "height": 768,
-      "output_formats": ["jpeg"],
-      "tags": ["pathological", "banding"]
+      "output_formats": [
+        "jpeg"
+      ],
+      "tags": [
+        "pathological",
+        "banding"
+      ],
+      "expected_pixel_sha256": "3d6da42de8e30b5b538f0ad8cc430c5dc5f55b86a538a17467cf09a560d07a2d"
     },
     {
       "name": "path_text_on_flat_small_jpeg",
@@ -120,8 +182,14 @@
       "seed": 0,
       "width": 512,
       "height": 384,
-      "output_formats": ["jpeg"],
-      "tags": ["pathological", "chroma"]
+      "output_formats": [
+        "jpeg"
+      ],
+      "tags": [
+        "pathological",
+        "chroma"
+      ],
+      "expected_pixel_sha256": "897dd96f52e6d04d03c6ffa8160e940f9540c92aefc9e7ce77d885ac3b02db17"
     },
     {
       "name": "animated_translation_small_apng",
@@ -130,8 +198,13 @@
       "seed": 11,
       "width": 192,
       "height": 144,
-      "output_formats": ["apng"],
-      "tags": ["animated"]
+      "output_formats": [
+        "apng"
+      ],
+      "tags": [
+        "animated"
+      ],
+      "expected_pixel_sha256": "879773c1aa094f154e0166821db3a2eccc868f51481fc4b7e9378e5017f78834"
     },
     {
       "name": "animated_redraw_small_gif",
@@ -140,8 +213,14 @@
       "seed": 12,
       "width": 192,
       "height": 144,
-      "output_formats": ["gif"],
-      "tags": ["animated", "worst_case"]
+      "output_formats": [
+        "gif"
+      ],
+      "tags": [
+        "animated",
+        "worst_case"
+      ],
+      "expected_pixel_sha256": "317383ed49027df8c420206774f64da08c70cd566fcb0bf7557deebbb122e536"
     }
   ]
 }

@@ -30,7 +30,14 @@ def _entry(kind: str, *, seed: int = 1, w: int = 96, h: int = 96, **params) -> M
     )
 
 
-@pytest.fixture(params=known_kinds())
+# Stub kinds that intentionally raise rather than produce pixels — skip them
+# in the parametrised synthesizer tests (they have their own error-path tests).
+_STUB_KINDS = {"fetched_photo"}
+
+_SYNTHESIZABLE_KINDS = [k for k in known_kinds() if k not in _STUB_KINDS]
+
+
+@pytest.fixture(params=_SYNTHESIZABLE_KINDS)
 def kind(request: pytest.FixtureRequest) -> str:
     return request.param
 
@@ -127,6 +134,7 @@ def test_known_kinds_includes_all_categories():
         "animated_redraw",
         "deep_color_smooth",
         "deep_color_thin_gradient",
+        "fetched_photo",
     }
     assert expected.issubset(kinds), f"missing: {expected - kinds}"
 

@@ -1,13 +1,23 @@
-"""Optional real-content fetchers (v1).
+"""Corpus fetchers — download and cache real-world images by hash-pinned URL."""
 
-Real fetchers (Kodak Lossless Suite, link-u/avif-sample-images for deep
-color edges, Unsplash for ecological validity) are deferred to v1. The
-synthetic suite alone covers every format x bucket cell, including the
-8 pathological cases — enough to ship an honest benchmark today.
+from bench.corpus.fetchers.http import (
+    DEFAULT_CACHE_ROOT,
+    MAX_DOWNLOAD_BYTES,
+    FetchError,
+    FetchHTTPError,
+    FetchIntegrityError,
+    FetchTooLargeError,
+    fetch,
+)
+from bench.corpus.manifest import SourceSpec
 
-When implemented, fetchers will:
-
-- Use hash-pinned URLs only (no random queries — pins reproducibility).
-- Warn-and-skip if an API key is missing rather than fail the build.
-- Cache to `bench/corpus/cache/` with atomic writes.
-"""
+__all__ = [
+    "DEFAULT_CACHE_ROOT",
+    "MAX_DOWNLOAD_BYTES",
+    "FetchError",
+    "FetchHTTPError",
+    "FetchIntegrityError",
+    "FetchTooLargeError",
+    "SourceSpec",
+    "fetch",
+]

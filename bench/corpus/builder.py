@@ -17,7 +17,10 @@ import logging
 import os
 import tempfile
 from dataclasses import dataclass, field
+from io import BytesIO
 from pathlib import Path
+
+from PIL import Image, ImageSequence
 
 from bench.corpus.conversion import (
     FormatNotSupportedError,
@@ -25,9 +28,11 @@ from bench.corpus.conversion import (
     is_animation_format,
     supported_formats,
 )
+from bench.corpus.fetchers import DEFAULT_CACHE_ROOT, fetch
 from bench.corpus.manifest import (
     Manifest,
     ManifestEntry,
+    Synthesized,
     bucket_for_size,
     pixel_sha256,
 )
@@ -44,6 +49,7 @@ class BuildOutcome:
     bucket_violations: list[str] = field(default_factory=list)
     format_skipped: list[str] = field(default_factory=list)
     pixel_hashes: dict[str, str] = field(default_factory=dict)
+    source_hashes: dict[str, str] = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
@@ -79,6 +85,23 @@ def _file_sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+def _load_fetched_content(entry: ManifestEntry, cache_root: Path) -> Synthesized:
+    """Fetch and decode a fetched-photo entry, returning PIL content.
+
+    For animated images, returns a list of frames.  For static images,
+    returns a single Image loaded into memory (so the file handle and
+    BytesIO can be GC'd).
+    """
+    path = fetch(entry.source, cache_root)  # type: ignore[arg-type]
+    data = path.read_bytes()
+    img = Image.open(BytesIO(data))
+    if getattr(img, "is_animated", False):
+        frames = [frame.copy() for frame in ImageSequence.Iterator(img)]
+        return frames
+    img.load()  # ensure pixels are decoded before the BytesIO goes out of scope
+    return img.copy()
+
+
 def build(
     manifest: Manifest,
     corpus_root: Path,
@@ -87,19 +110,29 @@ def build(
     formats_filter: set[str] | None = None,
     bucket_filter: str | None = None,
     tag_filter: str | None = None,
+    cache_root: Path = DEFAULT_CACHE_ROOT,
 ) -> BuildOutcome:
-    """Synthesize and encode every entry in the manifest."""
+    """Synthesize (or fetch) and encode every entry in the manifest."""
     available = set(supported_formats())
     outcome = BuildOutcome()
 
     entries = manifest.filter(bucket=bucket_filter, tag=tag_filter)
 
     for entry in entries:
-        try:
-            content = synthesize(entry)
-        except Exception as e:
-            outcome.bucket_violations.append(f"{entry.name}: synthesis failed: {e}")
-            continue
+        if entry.source is not None:
+            # Fetched entry — skip synthesis; download and decode from source URL
+            try:
+                content = _load_fetched_content(entry, cache_root)
+                outcome.source_hashes[entry.name] = entry.source.sha256
+            except Exception as e:
+                outcome.bucket_violations.append(f"{entry.name}: fetch failed: {e}")
+                continue
+        else:
+            try:
+                content = synthesize(entry)
+            except Exception as e:
+                outcome.bucket_violations.append(f"{entry.name}: synthesis failed: {e}")
+                continue
 
         outcome.pixel_hashes[entry.name] = pixel_sha256(content)
 
@@ -138,8 +171,11 @@ def build(
     return outcome
 
 
-def reseal_manifest(manifest: Manifest) -> Manifest:
-    """Run synthesis once per entry and write current pixel hashes back.
+def reseal_manifest(
+    manifest: Manifest,
+    cache_root: Path = DEFAULT_CACHE_ROOT,
+) -> Manifest:
+    """Run synthesis (or fetch) once per entry and write current pixel hashes back.
 
     Used to populate `expected_pixel_sha256` on a fresh manifest, or to
     re-seal after an intentional corpus refresh. Output is a new Manifest
@@ -152,7 +188,10 @@ def reseal_manifest(manifest: Manifest) -> Manifest:
         entries=[],
     )
     for entry in manifest.entries:
-        content = synthesize(entry)
+        if entry.source is not None:
+            content = _load_fetched_content(entry, cache_root)
+        else:
+            content = synthesize(entry)
         sealed_entry = ManifestEntry(
             name=entry.name,
             bucket=entry.bucket,
@@ -165,6 +204,7 @@ def reseal_manifest(manifest: Manifest) -> Manifest:
             tags=list(entry.tags),
             expected_pixel_sha256=pixel_sha256(content),
             encoded_sha256=dict(entry.encoded_sha256),
+            source=entry.source,
         )
         sealed.entries.append(sealed_entry)
     return sealed
@@ -176,4 +216,5 @@ __all__ = [
     "file_path",
     "is_animation_format",
     "reseal_manifest",
+    "DEFAULT_CACHE_ROOT",
 ]

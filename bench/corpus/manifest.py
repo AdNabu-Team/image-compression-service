@@ -28,7 +28,7 @@ from PIL import Image, ImageSequence
 # - a numpy uint16 array (10/12-bit deep color, shape (H, W, 3 or 4)).
 Synthesized = Union[Image.Image, list[Image.Image], np.ndarray]
 
-MANIFEST_VERSION = 1
+MANIFEST_VERSION = 2
 
 # Byte-size buckets. Range is [low, high). xlarge has no upper bound.
 BUCKET_RANGES: dict[str, tuple[int, int | None]] = {
@@ -38,6 +38,46 @@ BUCKET_RANGES: dict[str, tuple[int, int | None]] = {
     "large": (1024 * 1024, 5 * 1024 * 1024),
     "xlarge": (5 * 1024 * 1024, None),
 }
+
+
+@dataclass
+class SourceSpec:
+    """Origin spec for a fetched corpus entry.
+
+    `sha256` is the SHA-256 of the raw downloaded bytes.  The builder
+    verifies this before decoding, so a corrupt or replaced upstream file
+    is caught immediately.
+    """
+
+    url: str
+    sha256: str
+    license: str
+    attribution: str
+    notes: str = ""
+
+    def to_json(self) -> dict[str, Any]:
+        d: dict[str, Any] = {
+            "url": self.url,
+            "sha256": self.sha256,
+            "license": self.license,
+            "attribution": self.attribution,
+        }
+        if self.notes:
+            d["notes"] = self.notes
+        return d
+
+    @classmethod
+    def from_json(cls, raw: dict[str, Any]) -> SourceSpec:
+        try:
+            return cls(
+                url=raw["url"],
+                sha256=raw["sha256"],
+                license=raw["license"],
+                attribution=raw["attribution"],
+                notes=raw.get("notes", ""),
+            )
+        except (KeyError, TypeError) as e:
+            raise ManifestSchemaError(f"invalid source spec: {e}") from e
 
 
 class Bucket(str, Enum):
@@ -79,6 +119,7 @@ class ManifestEntry:
     tags: list[str] = field(default_factory=list)
     expected_pixel_sha256: str | None = None
     encoded_sha256: dict[str, dict[str, str]] = field(default_factory=dict)
+    source: SourceSpec | None = None
 
     def to_json(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -98,11 +139,15 @@ class ManifestEntry:
             d["expected_pixel_sha256"] = self.expected_pixel_sha256
         if self.encoded_sha256:
             d["encoded_sha256"] = self.encoded_sha256
+        if self.source is not None:
+            d["source"] = self.source.to_json()
         return d
 
     @classmethod
     def from_json(cls, raw: dict[str, Any]) -> ManifestEntry:
         try:
+            source_raw = raw.get("source")
+            source = SourceSpec.from_json(source_raw) if source_raw is not None else None
             return cls(
                 name=raw["name"],
                 bucket=Bucket(raw["bucket"]),
@@ -115,6 +160,7 @@ class ManifestEntry:
                 tags=list(raw.get("tags") or []),
                 expected_pixel_sha256=raw.get("expected_pixel_sha256"),
                 encoded_sha256=dict(raw.get("encoded_sha256") or {}),
+                source=source,
             )
         except (KeyError, ValueError, TypeError) as e:
             raise ManifestSchemaError(f"invalid entry {raw.get('name', '<unnamed>')}: {e}") from e
@@ -138,9 +184,9 @@ class Manifest:
     @classmethod
     def from_json(cls, raw: dict[str, Any]) -> Manifest:
         version = raw.get("manifest_version")
-        if version != MANIFEST_VERSION:
+        if version not in {1, 2}:
             raise ManifestSchemaError(
-                f"manifest_version={version!r} not supported; expected {MANIFEST_VERSION}. "
+                f"manifest_version={version!r} not supported; expected 2. "
                 f"Regenerate with `python -m bench.corpus build`."
             )
         try:
@@ -148,6 +194,7 @@ class Manifest:
                 name=raw["manifest_name"],
                 library_versions=dict(raw.get("library_versions") or {}),
                 entries=[ManifestEntry.from_json(e) for e in raw["entries"]],
+                manifest_version=version,
             )
         except (KeyError, TypeError) as e:
             raise ManifestSchemaError(f"invalid manifest header: {e}") from e
@@ -177,7 +224,7 @@ class Manifest:
 
 
 class ManifestSchemaError(Exception):
-    """Manifest JSON did not match the v1 schema."""
+    """Manifest JSON did not match the expected schema."""
 
 
 def atomic_write_json(path: Path, data: dict[str, Any]) -> None:

@@ -20,6 +20,7 @@ from pathlib import Path
 
 from bench.corpus.builder import build, reseal_manifest
 from bench.corpus.conversion import supported_formats
+from bench.corpus.fetchers import DEFAULT_CACHE_ROOT, FetchError, fetch
 from bench.corpus.manifest import (
     Manifest,
     ManifestSchemaError,
@@ -51,9 +52,10 @@ def cmd_build(args: argparse.Namespace) -> int:
     manifest = _load_manifest(args.manifest)
     corpus_root = Path(args.out)
     formats_filter = set(args.fmt) if args.fmt else None
+    cache_root = Path(args.cache) if args.cache else DEFAULT_CACHE_ROOT
 
     if args.seal:
-        sealed = reseal_manifest(manifest)
+        sealed = reseal_manifest(manifest, cache_root=cache_root)
         sealed.library_versions = collect_library_versions()
         out_path = _manifest_path(args.manifest)
         sealed.save(out_path)
@@ -67,6 +69,7 @@ def cmd_build(args: argparse.Namespace) -> int:
         formats_filter=formats_filter,
         bucket_filter=args.bucket,
         tag_filter=args.tag,
+        cache_root=cache_root,
     )
 
     print(
@@ -90,7 +93,17 @@ def cmd_verify(args: argparse.Namespace) -> int:
         print(f"schema error: {e}", file=sys.stderr)
         return 3
 
-    result = verify(manifest, synthesize)
+    cache_root = DEFAULT_CACHE_ROOT
+
+    def _synthesize_or_fetch(entry):
+        """Dispatch to fetcher or synthesizer depending on entry type."""
+        if entry.source is not None:
+            from bench.corpus.builder import _load_fetched_content
+
+            return _load_fetched_content(entry, cache_root)
+        return synthesize(entry)
+
+    result = verify(manifest, _synthesize_or_fetch)
 
     if result.schema_errors:
         print("SCHEMA ERRORS:", file=sys.stderr)
@@ -125,6 +138,31 @@ def cmd_list(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_fetch(args: argparse.Namespace) -> int:
+    """Pre-warm the fetcher cache for every fetched entry in the manifest."""
+    manifest = _load_manifest(args.manifest)
+    cache_root = Path(args.cache) if args.cache else DEFAULT_CACHE_ROOT
+
+    fetched_entries = [e for e in manifest.entries if e.source is not None]
+    if not fetched_entries:
+        print(f"manifest={manifest.name}: no fetched entries")
+        return 0
+
+    successes = 0
+    failures = 0
+    for entry in fetched_entries:
+        try:
+            path = fetch(entry.source, cache_root)  # type: ignore[arg-type]
+            print(f"  ok  {entry.name} -> {path}")
+            successes += 1
+        except FetchError as e:
+            print(f"  FAIL {entry.name}: {e}", file=sys.stderr)
+            failures += 1
+
+    print(f"\nfetch complete: {successes} ok, {failures} failed")
+    return 0 if failures == 0 else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m bench.corpus",
@@ -145,6 +183,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="re-synthesize and write expected_pixel_sha256 back into the manifest",
     )
+    p_build.add_argument(
+        "--cache",
+        default=None,
+        metavar="PATH",
+        help=f"fetcher cache directory (default: {DEFAULT_CACHE_ROOT})",
+    )
     p_build.set_defaults(func=cmd_build)
 
     p_verify = sub.add_parser("verify", help="re-synthesize and check pixel hashes")
@@ -154,6 +198,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_list = sub.add_parser("list", help="show manifest contents")
     p_list.add_argument("--manifest", default="core")
     p_list.set_defaults(func=cmd_list)
+
+    p_fetch = sub.add_parser("fetch", help="pre-warm fetcher cache for all fetched entries")
+    p_fetch.add_argument("--manifest", default="full")
+    p_fetch.add_argument(
+        "--cache",
+        default=None,
+        metavar="PATH",
+        help=f"fetcher cache directory (default: {DEFAULT_CACHE_ROOT})",
+    )
+    p_fetch.set_defaults(func=cmd_fetch)
 
     return parser
 

@@ -30,6 +30,11 @@ python -m bench.corpus build --manifest core
 python -m bench.corpus verify --manifest core             # Re-synthesize and check pixel hashes
 python -m bench.corpus list --manifest core                # Inspect manifest contents
 
+# Fetched corpus (Kodak + real-world images, hash-pinned URLs)
+python -m bench.corpus fetch --manifest full               # Pre-warm cache (downloads + verifies SHA256)
+python -m bench.corpus build --manifest full               # Build from cached downloads
+python -m bench.corpus verify --manifest full              # Verify pixel hashes
+
 # Run benchmarks
 python -m bench.run --mode quick                           # 1 iter per case, ~1 min
 python -m bench.run --mode timing --repeat 5 --warmup 1    # p50/p95/p99 + MAD

@@ -1,0 +1,2262 @@
+{
+  "manifest_version": 2,
+  "manifest_name": "full",
+  "library_versions": {
+    "Pillow": "10.4.0",
+    "numpy": "2.0.2",
+    "pillow_heif": "0.22.0"
+  },
+  "entries": [
+    {
+      "name": "kodak_01_door_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "433de1d251481da8f0a3f77e8ae6ce036c5e04deeb9bd0a99a648bfc543dda52",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim01.png",
+        "sha256": "a56e27cbf5f843c048b6af1d6e090760e9c92fadba88b7dee0205918a37523bd",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim01: door"
+      }
+    },
+    {
+      "name": "kodak_01_door_jpeg_webp",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "jpeg",
+        "webp"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "433de1d251481da8f0a3f77e8ae6ce036c5e04deeb9bd0a99a648bfc543dda52",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim01.png",
+        "sha256": "a56e27cbf5f843c048b6af1d6e090760e9c92fadba88b7dee0205918a37523bd",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim01: door"
+      }
+    },
+    {
+      "name": "kodak_01_door_avif",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "433de1d251481da8f0a3f77e8ae6ce036c5e04deeb9bd0a99a648bfc543dda52",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim01.png",
+        "sha256": "a56e27cbf5f843c048b6af1d6e090760e9c92fadba88b7dee0205918a37523bd",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim01: door"
+      }
+    },
+    {
+      "name": "kodak_03_hats_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "ae2aef95e1e059a96d2b33426a2b6ead25d4495ef64533b8b2221af2d7e7556c",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim03.png",
+        "sha256": "e25ca1ff2f0c0cb5fdfd5f9b0a0bb21ac4c3de3c84a67f35b09a85d3306249db",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim03: hats"
+      }
+    },
+    {
+      "name": "kodak_03_hats_lossy",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "ae2aef95e1e059a96d2b33426a2b6ead25d4495ef64533b8b2221af2d7e7556c",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim03.png",
+        "sha256": "e25ca1ff2f0c0cb5fdfd5f9b0a0bb21ac4c3de3c84a67f35b09a85d3306249db",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim03: hats"
+      }
+    },
+    {
+      "name": "kodak_05_motocross_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "b14bc3fbedc07012e0fe0435e3a8dd353dbb641657cb1b13940c74eb60795185",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim05.png",
+        "sha256": "10349e963c5c813d327852f82c1795fa4148d69fedffc4c589bee458e3ac3d53",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim05: motocross"
+      }
+    },
+    {
+      "name": "kodak_05_motocross_jpeg_webp",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "jpeg",
+        "webp"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "b14bc3fbedc07012e0fe0435e3a8dd353dbb641657cb1b13940c74eb60795185",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim05.png",
+        "sha256": "10349e963c5c813d327852f82c1795fa4148d69fedffc4c589bee458e3ac3d53",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim05: motocross"
+      }
+    },
+    {
+      "name": "kodak_05_motocross_avif",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "b14bc3fbedc07012e0fe0435e3a8dd353dbb641657cb1b13940c74eb60795185",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim05.png",
+        "sha256": "10349e963c5c813d327852f82c1795fa4148d69fedffc4c589bee458e3ac3d53",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim05: motocross"
+      }
+    },
+    {
+      "name": "kodak_07_door2_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "c726e84caba7a5b166ff9ae3bd552b5ae8b72f1ea22e5be73fd96427ab096068",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim07.png",
+        "sha256": "b77d3f006f42414bb242222e0482e750c0fb9e5ee8d4bed2f6f11c5605fe54a4",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim07: door close-up"
+      }
+    },
+    {
+      "name": "kodak_07_door2_lossy",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "c726e84caba7a5b166ff9ae3bd552b5ae8b72f1ea22e5be73fd96427ab096068",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim07.png",
+        "sha256": "b77d3f006f42414bb242222e0482e750c0fb9e5ee8d4bed2f6f11c5605fe54a4",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim07: door close-up"
+      }
+    },
+    {
+      "name": "kodak_13_stream_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "1b49ed5cc856193bf4cea487c1961d6c5aaf6aef8ab143915cf80dba8800556d",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim13.png",
+        "sha256": "bc34a3ce58dea09dce1704c997171602de90cb34d0c8503a988b77f473d39b08",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim13: stream"
+      }
+    },
+    {
+      "name": "kodak_13_stream_lossy",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "1b49ed5cc856193bf4cea487c1961d6c5aaf6aef8ab143915cf80dba8800556d",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim13.png",
+        "sha256": "bc34a3ce58dea09dce1704c997171602de90cb34d0c8503a988b77f473d39b08",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim13: stream"
+      }
+    },
+    {
+      "name": "kodak_19_lighthouse_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 512,
+      "height": 768,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "034df7bc002315032a11a823f9f419be5335807b5a2b4ce471639027a019f87d",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim19.png",
+        "sha256": "b7450b264b1b0a411390d8931b112c27905a992520fc90569dc4b920aa32bbdc",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim19: lighthouse (portrait orientation: 512x768)"
+      }
+    },
+    {
+      "name": "kodak_19_lighthouse_lossy",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 512,
+      "height": 768,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "034df7bc002315032a11a823f9f419be5335807b5a2b4ce471639027a019f87d",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim19.png",
+        "sha256": "b7450b264b1b0a411390d8931b112c27905a992520fc90569dc4b920aa32bbdc",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim19: lighthouse (portrait orientation: 512x768)"
+      }
+    },
+    {
+      "name": "kodak_21_sailboats_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "9ff34aa3abfdfa6e7ca1cb3d5528588e960de34721fee12c1339a6b0043bfe67",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim21.png",
+        "sha256": "ac958597c82073f6bb65129c68f72b651db5b9efd82e11547d07350214bc268b",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim21: sailboats"
+      }
+    },
+    {
+      "name": "kodak_21_sailboats_lossy",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "9ff34aa3abfdfa6e7ca1cb3d5528588e960de34721fee12c1339a6b0043bfe67",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim21.png",
+        "sha256": "ac958597c82073f6bb65129c68f72b651db5b9efd82e11547d07350214bc268b",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim21: sailboats"
+      }
+    },
+    {
+      "name": "kodak_23_parrots_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "c1499741d120eaeaf1ea6270b30a781186cd48b15b46d71497c4eee7d5f83c4d",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim23.png",
+        "sha256": "e3111a2fd4da24af15d6459ef9eacfe54106b38e27b4a21821b75c3f5d2d5baf",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim23: parrots"
+      }
+    },
+    {
+      "name": "kodak_23_parrots_lossy",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "c1499741d120eaeaf1ea6270b30a781186cd48b15b46d71497c4eee7d5f83c4d",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim23.png",
+        "sha256": "e3111a2fd4da24af15d6459ef9eacfe54106b38e27b4a21821b75c3f5d2d5baf",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim23: parrots"
+      }
+    },
+    {
+      "name": "kodak_02_woman_hat_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "387aa89b270ce3ef72d9d48245d6a33da3d652f372205f3ee5a3cd4790a67222",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim02.png",
+        "sha256": "4f4b74a79237e311d72cad958237b5f7088d8bce1c82305ebefe1a70e3022dfd",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim02: woman with hat"
+      }
+    },
+    {
+      "name": "kodak_02_woman_hat_lossy",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "387aa89b270ce3ef72d9d48245d6a33da3d652f372205f3ee5a3cd4790a67222",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim02.png",
+        "sha256": "4f4b74a79237e311d72cad958237b5f7088d8bce1c82305ebefe1a70e3022dfd",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim02: woman with hat"
+      }
+    },
+    {
+      "name": "kodak_04_girl_portrait_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 512,
+      "height": 768,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "portrait",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "5179b8e4e760c40279db78426e6e23e94ea051ede42d00165b41ff740c8ea128",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim04.png",
+        "sha256": "e3b946107c5d3441c022f678d0c3caf1e224d81b1604ba840a4f88e562de61aa",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim04: girl (portrait orientation: 512x768)"
+      }
+    },
+    {
+      "name": "kodak_04_girl_portrait_lossy",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 512,
+      "height": 768,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "portrait",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "5179b8e4e760c40279db78426e6e23e94ea051ede42d00165b41ff740c8ea128",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim04.png",
+        "sha256": "e3b946107c5d3441c022f678d0c3caf1e224d81b1604ba840a4f88e562de61aa",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim04: girl (portrait orientation: 512x768)"
+      }
+    },
+    {
+      "name": "kodak_06_toys_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "d5503cd257d010839a43d63f150468482c9cef1902933a603cd446266a4c3224",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim06.png",
+        "sha256": "363510303b715d4cbc384e1ce227e466b613a09e1b71ae985882bf8e7fbd9b18",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim06: toys"
+      }
+    },
+    {
+      "name": "kodak_06_toys_lossy",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "d5503cd257d010839a43d63f150468482c9cef1902933a603cd446266a4c3224",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim06.png",
+        "sha256": "363510303b715d4cbc384e1ce227e466b613a09e1b71ae985882bf8e7fbd9b18",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim06: toys"
+      }
+    },
+    {
+      "name": "kodak_08_bikes_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "46302abc679960f3044b53ae5d915618990d4890e322f903a74865b5dfa35c35",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim08.png",
+        "sha256": "ba23983c76b4832ee0e8af0592664756841a16779acd69f792e268fb6d13d6e7",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim08: bikes"
+      }
+    },
+    {
+      "name": "kodak_08_bikes_jpeg_webp",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "jpeg",
+        "webp"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "46302abc679960f3044b53ae5d915618990d4890e322f903a74865b5dfa35c35",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim08.png",
+        "sha256": "ba23983c76b4832ee0e8af0592664756841a16779acd69f792e268fb6d13d6e7",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim08: bikes"
+      }
+    },
+    {
+      "name": "kodak_08_bikes_avif",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "46302abc679960f3044b53ae5d915618990d4890e322f903a74865b5dfa35c35",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim08.png",
+        "sha256": "ba23983c76b4832ee0e8af0592664756841a16779acd69f792e268fb6d13d6e7",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim08: bikes"
+      }
+    },
+    {
+      "name": "kodak_09_woman_portrait_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 512,
+      "height": 768,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "portrait",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "10497bdc48c83f6c91faf707ff544436c59e7a7bb4ae79cab47c64e3bca6555b",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim09.png",
+        "sha256": "6a4361c2fc194feb4edaa9f9a4a0620fb9943e460ac7fdf037fb0f6dd6607a7d",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim09: woman (portrait orientation: 512x768)"
+      }
+    },
+    {
+      "name": "kodak_09_woman_portrait_lossy",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 512,
+      "height": 768,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "portrait",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "10497bdc48c83f6c91faf707ff544436c59e7a7bb4ae79cab47c64e3bca6555b",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim09.png",
+        "sha256": "6a4361c2fc194feb4edaa9f9a4a0620fb9943e460ac7fdf037fb0f6dd6607a7d",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim09: woman (portrait orientation: 512x768)"
+      }
+    },
+    {
+      "name": "kodak_10_tanker_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 512,
+      "height": 768,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "14b5e79ebe701df9a961ef0ab0107bcdf68e07c99eb5b1bd86d5ef58a9147643",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim10.png",
+        "sha256": "9dfb70f5867c29ff9ed6313683f19b3d867849e40fbc0c4c54a4a89df341cf23",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim10: tanker (portrait orientation: 512x768)"
+      }
+    },
+    {
+      "name": "kodak_10_tanker_lossy",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 512,
+      "height": 768,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "14b5e79ebe701df9a961ef0ab0107bcdf68e07c99eb5b1bd86d5ef58a9147643",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim10.png",
+        "sha256": "9dfb70f5867c29ff9ed6313683f19b3d867849e40fbc0c4c54a4a89df341cf23",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim10: tanker (portrait orientation: 512x768)"
+      }
+    },
+    {
+      "name": "kodak_11_boats_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "556d7cc60b871074f6463bf9e6a67f1a21468b91936ab99645ecdbfda33b6e5a",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim11.png",
+        "sha256": "7936814b58b5387fce2e4e2488b4ec830dadd95fa9520f358ddb30990b50f2b6",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim11: boats on water"
+      }
+    },
+    {
+      "name": "kodak_11_boats_lossy",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "556d7cc60b871074f6463bf9e6a67f1a21468b91936ab99645ecdbfda33b6e5a",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim11.png",
+        "sha256": "7936814b58b5387fce2e4e2488b4ec830dadd95fa9520f358ddb30990b50f2b6",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim11: boats on water"
+      }
+    },
+    {
+      "name": "kodak_12_nurse_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "6f1c6c967fc5e85658294d30fba261c90eb7db3ea9099c46988d8c5233ce1c20",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim12.png",
+        "sha256": "d78c37c2f04f23761ed2367dd77e2db584ddd4c3950833fecf89f199a8126980",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim12: nurse"
+      }
+    },
+    {
+      "name": "kodak_12_nurse_lossy",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "6f1c6c967fc5e85658294d30fba261c90eb7db3ea9099c46988d8c5233ce1c20",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim12.png",
+        "sha256": "d78c37c2f04f23761ed2367dd77e2db584ddd4c3950833fecf89f199a8126980",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim12: nurse"
+      }
+    },
+    {
+      "name": "kodak_14_stamps_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "high_detail",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "3a4a2f72ec07d27fa3457f0264ce298c53ac5151aaa85bd73fa14b03c33a3fce",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim14.png",
+        "sha256": "55a94550ff18f3246c4074fd32b77b0c74447c26b6ad274d564d999c0450ba6e",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim14: stamps (high-detail, texture-rich)"
+      }
+    },
+    {
+      "name": "kodak_14_stamps_jpeg",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "jpeg"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "high_detail",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "3a4a2f72ec07d27fa3457f0264ce298c53ac5151aaa85bd73fa14b03c33a3fce",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim14.png",
+        "sha256": "55a94550ff18f3246c4074fd32b77b0c74447c26b6ad274d564d999c0450ba6e",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim14: stamps (high-detail, texture-rich)"
+      }
+    },
+    {
+      "name": "kodak_14_stamps_webp_avif",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "high_detail",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "3a4a2f72ec07d27fa3457f0264ce298c53ac5151aaa85bd73fa14b03c33a3fce",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim14.png",
+        "sha256": "55a94550ff18f3246c4074fd32b77b0c74447c26b6ad274d564d999c0450ba6e",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim14: stamps (high-detail, texture-rich)"
+      }
+    },
+    {
+      "name": "kodak_15_harbor_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "75ec030f2fc84dc2e3e87c41b1519237e24e3a0aeea46023798162875e47e63f",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim15.png",
+        "sha256": "7538cbb80cb9103606c48b806eae57d56c885c7f90b9b3be70a41160f9cbb683",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim15: harbor"
+      }
+    },
+    {
+      "name": "kodak_15_harbor_lossy",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "75ec030f2fc84dc2e3e87c41b1519237e24e3a0aeea46023798162875e47e63f",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim15.png",
+        "sha256": "7538cbb80cb9103606c48b806eae57d56c885c7f90b9b3be70a41160f9cbb683",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim15: harbor"
+      }
+    },
+    {
+      "name": "kodak_16_statues_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "089f8df62ec0362aee5dc19ee99ad66e3734df2c0272ba25483f85152bb956fc",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim16.png",
+        "sha256": "a89c7268ccd4718ba424a99fc4643c572cf692ca6eae887185ceb4e9f11d2e54",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim16: statues"
+      }
+    },
+    {
+      "name": "kodak_16_statues_lossy",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "089f8df62ec0362aee5dc19ee99ad66e3734df2c0272ba25483f85152bb956fc",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim16.png",
+        "sha256": "a89c7268ccd4718ba424a99fc4643c572cf692ca6eae887185ceb4e9f11d2e54",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim16: statues"
+      }
+    },
+    {
+      "name": "kodak_17_mountain_road_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 512,
+      "height": 768,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "portrait",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "fd7b42a98609c90e0f108eb92e84540ef481c0dcfd5633c6f24410673b2e263c",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim17.png",
+        "sha256": "37afcc89fbdcb76d9518e04b2fc011027e2f4cd14b3b2f83cefd721641a47c5b",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim17: mountain road (portrait orientation: 512x768)"
+      }
+    },
+    {
+      "name": "kodak_17_mountain_road_lossy",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 512,
+      "height": 768,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "portrait",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "fd7b42a98609c90e0f108eb92e84540ef481c0dcfd5633c6f24410673b2e263c",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim17.png",
+        "sha256": "37afcc89fbdcb76d9518e04b2fc011027e2f4cd14b3b2f83cefd721641a47c5b",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim17: mountain road (portrait orientation: 512x768)"
+      }
+    },
+    {
+      "name": "kodak_18_female_head_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 512,
+      "height": 768,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "portrait",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "7669e929beb7795ba5bc84a01bdbcd5717af43e2fb19558b6bfdcf0e51a546c9",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim18.png",
+        "sha256": "1a9258c365988961d87a0598725b609139c303ad48a5aad6c503c3b1a87849aa",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim18: female head (portrait orientation: 512x768)"
+      }
+    },
+    {
+      "name": "kodak_18_female_head_jpeg_webp",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 512,
+      "height": 768,
+      "output_formats": [
+        "jpeg",
+        "webp"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "portrait",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "7669e929beb7795ba5bc84a01bdbcd5717af43e2fb19558b6bfdcf0e51a546c9",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim18.png",
+        "sha256": "1a9258c365988961d87a0598725b609139c303ad48a5aad6c503c3b1a87849aa",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim18: female head (portrait orientation: 512x768)"
+      }
+    },
+    {
+      "name": "kodak_18_female_head_avif",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 512,
+      "height": 768,
+      "output_formats": [
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "portrait",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "7669e929beb7795ba5bc84a01bdbcd5717af43e2fb19558b6bfdcf0e51a546c9",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim18.png",
+        "sha256": "1a9258c365988961d87a0598725b609139c303ad48a5aad6c503c3b1a87849aa",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim18: female head (portrait orientation: 512x768)"
+      }
+    },
+    {
+      "name": "kodak_20_big_tree_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "a9cd30ba70e85f6bdd6414f4149180b1ab0a71bd7460ccaa4cc4d3914307c444",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim20.png",
+        "sha256": "3b46c71e3b92a563820ba32936be8330c586c41f938efd94be938386aae4328a",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim20: big tree / plants"
+      }
+    },
+    {
+      "name": "kodak_20_big_tree_lossy",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "a9cd30ba70e85f6bdd6414f4149180b1ab0a71bd7460ccaa4cc4d3914307c444",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim20.png",
+        "sha256": "3b46c71e3b92a563820ba32936be8330c586c41f938efd94be938386aae4328a",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim20: big tree / plants"
+      }
+    },
+    {
+      "name": "kodak_22_boats_dock_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "db769fea650cb8636cf1ff4146a198c48b9273e9d2271bb6a6f79060e1cf8138",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim22.png",
+        "sha256": "1cee58eb1f2d9c7ebb254d208a03c783ce6cf2c4d8c2cf45e235dd23b4ce1b29",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim22: boats at dock"
+      }
+    },
+    {
+      "name": "kodak_22_boats_dock_lossy",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "db769fea650cb8636cf1ff4146a198c48b9273e9d2271bb6a6f79060e1cf8138",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim22.png",
+        "sha256": "1cee58eb1f2d9c7ebb254d208a03c783ce6cf2c4d8c2cf45e235dd23b4ce1b29",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim22: boats at dock"
+      }
+    },
+    {
+      "name": "kodak_24_woman_cap_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "ef98786f70d4d0c7bdd852545e8e4d97985101c32e96848e1121db4065be054a",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim24.png",
+        "sha256": "1071c68372cc5a01435c2c225a5cf7d4bb803846ec08bb6b3d6721b156d7cb96",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim24: woman with cap"
+      }
+    },
+    {
+      "name": "kodak_24_woman_cap_jpeg",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "jpeg"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "ef98786f70d4d0c7bdd852545e8e4d97985101c32e96848e1121db4065be054a",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim24.png",
+        "sha256": "1071c68372cc5a01435c2c225a5cf7d4bb803846ec08bb6b3d6721b156d7cb96",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim24: woman with cap"
+      }
+    },
+    {
+      "name": "kodak_24_woman_cap_webp_avif",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 768,
+      "height": 512,
+      "output_formats": [
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "kodak",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "ef98786f70d4d0c7bdd852545e8e4d97985101c32e96848e1121db4065be054a",
+      "source": {
+        "url": "https://r0k.us/graphics/kodak/kodak/kodim24.png",
+        "sha256": "1071c68372cc5a01435c2c225a5cf7d4bb803846ec08bb6b3d6721b156d7cb96",
+        "license": "Public domain (de facto, Kodak Corp release)",
+        "attribution": "Eastman Kodak Company \u2014 Kodak Lossless True Color Image Suite",
+        "notes": "kodim24: woman with cap"
+      }
+    },
+    {
+      "name": "linku_hato_jpeg_webp_avif",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 3082,
+      "height": 2048,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "linku",
+        "high_res",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "6a817517b87b001df82ae1d42365134ef7fc49a0e13346d6b7e36a618c07a7ca",
+      "source": {
+        "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/hato.jpg",
+        "sha256": "6d4804e5e4adf36a6b138544c81b743ed7abdd9a495a43e883ec77689ca28943",
+        "license": "MIT",
+        "attribution": "link-u Inc. \u2014 avif-sample-images",
+        "notes": "hato: pigeon photo, 3082x2048, high-res JPEG source"
+      }
+    },
+    {
+      "name": "linku_kimono_jpeg_webp_avif",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 722,
+      "height": 1024,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "linku",
+        "portrait",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "77e4d298503e14559d98016937702113de49c42ca77fe2eea65a627aed085f46",
+      "source": {
+        "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/kimono.jpg",
+        "sha256": "a6ad58e3cea437ee0c841115ba67ae7354de7af734de50de9d0853dd4e571577",
+        "license": "MIT",
+        "attribution": "link-u Inc. \u2014 avif-sample-images",
+        "notes": "kimono: costume portrait, 722x1024, portrait orientation"
+      }
+    },
+    {
+      "name": "linku_fox_jpeg_webp",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 1204,
+      "height": 800,
+      "output_formats": [
+        "jpeg",
+        "webp"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "linku",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "a931bd69df22fe2a4ec3f43b97dd8c9f623f8c4aa524eaab424c3ab8627ff618",
+      "source": {
+        "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.jpg",
+        "sha256": "927997a90ae88ead007283bf9c1392159d0acd2e9890522146211fda2112a2d9",
+        "license": "MIT",
+        "attribution": "link-u Inc. \u2014 avif-sample-images",
+        "notes": "fox: outdoor animal photo, 1204x800"
+      }
+    },
+    {
+      "name": "linku_fox_avif",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 1204,
+      "height": 800,
+      "output_formats": [
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "linku",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "a931bd69df22fe2a4ec3f43b97dd8c9f623f8c4aa524eaab424c3ab8627ff618",
+      "source": {
+        "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.jpg",
+        "sha256": "927997a90ae88ead007283bf9c1392159d0acd2e9890522146211fda2112a2d9",
+        "license": "MIT",
+        "attribution": "link-u Inc. \u2014 avif-sample-images",
+        "notes": "fox: outdoor animal photo, 1204x800"
+      }
+    },
+    {
+      "name": "linku_plum_blossom_png_jpeg_webp",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 2048,
+      "height": 2048,
+      "output_formats": [
+        "png",
+        "jpeg",
+        "webp"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "linku",
+        "transparent",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "4abc6cdcea3662482bc2857a4536200947b6a4e57d9511954dd49e31e697cb23",
+      "source": {
+        "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.png",
+        "sha256": "af6ea005b726ca39f342e946aa53bed88e5a140413ce896d166bb35ab0aa3b4f",
+        "license": "MIT",
+        "attribution": "link-u Inc. \u2014 avif-sample-images",
+        "notes": "plum-blossom-large: 2048x2048 RGBA transparent illustration"
+      }
+    },
+    {
+      "name": "linku_red_color_profile_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 800,
+      "height": 800,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "real_world",
+        "linku",
+        "color_profile",
+        "graphic",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "ddeed205f12e527f9dcefc582589832f38108989ef9c0a4f60136b8c5af3d4a1",
+      "source": {
+        "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/red-at-12-oclock-with-color-profile.png",
+        "sha256": "4eab95e358eb48e052c7b8c94d30a8c6cb1c9c3c2dfd9845240281dd5dd7b800",
+        "license": "MIT",
+        "attribution": "link-u Inc. \u2014 avif-sample-images",
+        "notes": "red-at-12-oclock-with-color-profile: 800x800 sRGB color-profile test image"
+      }
+    },
+    {
+      "name": "linku_red_color_profile_lossy",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 800,
+      "height": 800,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "real_world",
+        "linku",
+        "color_profile",
+        "graphic",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "ddeed205f12e527f9dcefc582589832f38108989ef9c0a4f60136b8c5af3d4a1",
+      "source": {
+        "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/red-at-12-oclock-with-color-profile.png",
+        "sha256": "4eab95e358eb48e052c7b8c94d30a8c6cb1c9c3c2dfd9845240281dd5dd7b800",
+        "license": "MIT",
+        "attribution": "link-u Inc. \u2014 avif-sample-images",
+        "notes": "red-at-12-oclock-with-color-profile: 800x800 sRGB color-profile test image"
+      }
+    },
+    {
+      "name": "nasa_mars_globe_jpeg_webp_avif",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 1700,
+      "height": 2164,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "nasa",
+        "astronomy",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "1a320a8a53886e2110e25695d6e61808ad9aec687072affdbe0acbaf4ee31dbe",
+      "source": {
+        "url": "https://images-assets.nasa.gov/image/PIA00342/PIA00342~orig.jpg",
+        "sha256": "9215852f0c7b55ce421776791ffbfbb4b9eae995cbf4172bce9363a75c1481a1",
+        "license": "NASA Open Data / Public Domain",
+        "attribution": "NASA / JPL-Caltech \u2014 Mars Global Surveyor, PIA00342",
+        "notes": "Mars globe, 1700x2164, planetary science image"
+      }
+    },
+    {
+      "name": "nasa_ring_nebula_jpeg",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 1280,
+      "height": 1231,
+      "output_formats": [
+        "jpeg"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "nasa",
+        "astronomy",
+        "hubble",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "b80daaeef2c3397b4f6e2b20cfbfe753cffc1bef9497ec9fc99a0a210432cb3d",
+      "source": {
+        "url": "https://images-assets.nasa.gov/image/GSFC_20171208_Archive_e001464/GSFC_20171208_Archive_e001464~orig.jpg",
+        "sha256": "c1993c367417eaf1b630040c7bc20324821f70652a9f0c6a21262befca44ae69",
+        "license": "NASA Open Data / Public Domain",
+        "attribution": "NASA GSFC / ESA Hubble \u2014 Ring Nebula, GSFC_20171208_Archive_e001464",
+        "notes": "Hubble Ring Nebula, 1280x1231, space nebula"
+      }
+    },
+    {
+      "name": "nasa_ring_nebula_webp_avif",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 1280,
+      "height": 1231,
+      "output_formats": [
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "nasa",
+        "astronomy",
+        "hubble",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "b80daaeef2c3397b4f6e2b20cfbfe753cffc1bef9497ec9fc99a0a210432cb3d",
+      "source": {
+        "url": "https://images-assets.nasa.gov/image/GSFC_20171208_Archive_e001464/GSFC_20171208_Archive_e001464~orig.jpg",
+        "sha256": "c1993c367417eaf1b630040c7bc20324821f70652a9f0c6a21262befca44ae69",
+        "license": "NASA Open Data / Public Domain",
+        "attribution": "NASA GSFC / ESA Hubble \u2014 Ring Nebula, GSFC_20171208_Archive_e001464",
+        "notes": "Hubble Ring Nebula, 1280x1231, space nebula"
+      }
+    },
+    {
+      "name": "nasa_earth_orbit_jpeg_webp_avif",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 1920,
+      "height": 1080,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "nasa",
+        "earth",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "04f9f07a61a54618a14db9031a77ab14b052d63c31bb308c1733d541b397014a",
+      "source": {
+        "url": "https://images-assets.nasa.gov/image/GSFC_20171208_Archive_e000746/GSFC_20171208_Archive_e000746~orig.jpg",
+        "sha256": "d8de26d038d2283db210e740d0c312ed1c0168d04454aca28717117dc3fdfa72",
+        "license": "NASA Open Data / Public Domain",
+        "attribution": "NASA GSFC \u2014 Earth from Orbit 2014, GSFC_20171208_Archive_e000746",
+        "notes": "Earth from orbit, 1920x1080, HD widescreen"
+      }
+    },
+    {
+      "name": "nasa_nitrogen_nebula_jpeg_webp",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 1280,
+      "height": 1323,
+      "output_formats": [
+        "jpeg",
+        "webp"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "nasa",
+        "astronomy",
+        "hubble",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "40ccd16d34e22bb45083a99cfc3bf27a8c1026884a67ff1c69f8754aed019e1b",
+      "source": {
+        "url": "https://images-assets.nasa.gov/image/GSFC_20171208_Archive_e000699/GSFC_20171208_Archive_e000699~orig.jpg",
+        "sha256": "b6c80cf6cd15c68fdb6da66c6bffc6ada5765b66f8b590c27651950b9816555b",
+        "license": "NASA Open Data / Public Domain",
+        "attribution": "NASA GSFC / ESA Hubble \u2014 Nitrogen-Rich Nebula, GSFC_20171208_Archive_e000699",
+        "notes": "Hubble nitrogen-rich nebula, 1280x1323"
+      }
+    },
+    {
+      "name": "nasa_nitrogen_nebula_avif",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 1280,
+      "height": 1323,
+      "output_formats": [
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "nasa",
+        "astronomy",
+        "hubble",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "40ccd16d34e22bb45083a99cfc3bf27a8c1026884a67ff1c69f8754aed019e1b",
+      "source": {
+        "url": "https://images-assets.nasa.gov/image/GSFC_20171208_Archive_e000699/GSFC_20171208_Archive_e000699~orig.jpg",
+        "sha256": "b6c80cf6cd15c68fdb6da66c6bffc6ada5765b66f8b590c27651950b9816555b",
+        "license": "NASA Open Data / Public Domain",
+        "attribution": "NASA GSFC / ESA Hubble \u2014 Nitrogen-Rich Nebula, GSFC_20171208_Archive_e000699",
+        "notes": "Hubble nitrogen-rich nebula, 1280x1323"
+      }
+    },
+    {
+      "name": "nasa_preplanetary_nebula_jpeg_webp",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 1280,
+      "height": 1203,
+      "output_formats": [
+        "jpeg",
+        "webp"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "nasa",
+        "astronomy",
+        "hubble",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "236867e3d5ca1ad76a60dae9ce984955f5520a8b85e055b786489da2bbefe7c9",
+      "source": {
+        "url": "https://images-assets.nasa.gov/image/GSFC_20171208_Archive_e001743/GSFC_20171208_Archive_e001743~orig.jpg",
+        "sha256": "fa954cddd9299175a72f15352418c26af661574215db8e8cc0360bf734e7b28d",
+        "license": "NASA Open Data / Public Domain",
+        "attribution": "NASA GSFC / ESA Hubble \u2014 Preplanetary Nebula Searchlight Beams, GSFC_20171208_Archive_e001743",
+        "notes": "Hubble preplanetary nebula, 1280x1203"
+      }
+    },
+    {
+      "name": "nasa_preplanetary_nebula_avif",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 1280,
+      "height": 1203,
+      "output_formats": [
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "nasa",
+        "astronomy",
+        "hubble",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "236867e3d5ca1ad76a60dae9ce984955f5520a8b85e055b786489da2bbefe7c9",
+      "source": {
+        "url": "https://images-assets.nasa.gov/image/GSFC_20171208_Archive_e001743/GSFC_20171208_Archive_e001743~orig.jpg",
+        "sha256": "fa954cddd9299175a72f15352418c26af661574215db8e8cc0360bf734e7b28d",
+        "license": "NASA Open Data / Public Domain",
+        "attribution": "NASA GSFC / ESA Hubble \u2014 Preplanetary Nebula Searchlight Beams, GSFC_20171208_Archive_e001743",
+        "notes": "Hubble preplanetary nebula, 1280x1203"
+      }
+    },
+    {
+      "name": "nasa_lagoon_nebula_jpeg_webp_avif",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 3924,
+      "height": 2006,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "nasa",
+        "astronomy",
+        "hubble",
+        "high_res",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "ce6922bcab6abc9e7f34162dd1ae617d2eafbec8b19dd06c7b4f5ec5591859bc",
+      "source": {
+        "url": "https://images-assets.nasa.gov/image/GSFC_20171208_Archive_e001955/GSFC_20171208_Archive_e001955~orig.jpg",
+        "sha256": "54fdaeec4372a47d2fafaf3d726ca88953858efa5b5a552352d7c630555aa7e4",
+        "license": "NASA Open Data / Public Domain",
+        "attribution": "NASA GSFC / ESA Hubble \u2014 Lagoon Nebula, GSFC_20171208_Archive_e001955",
+        "notes": "Hubble Lagoon Nebula heart, 3924x2006, high-res"
+      }
+    },
+    {
+      "name": "nasa_crab_nebula_jpeg",
+      "bucket": "large",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 3864,
+      "height": 3864,
+      "output_formats": [
+        "jpeg"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "nasa",
+        "astronomy",
+        "high_res",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "e94453f3c97c17b3c41b502fcec3d1238e87f47d4c71028eb524715022a02177",
+      "source": {
+        "url": "https://images-assets.nasa.gov/image/PIA03606/PIA03606~orig.jpg",
+        "sha256": "c9ff0251e925902c9aeffd9c92fefd06b97b9a99bc24c0c11ce5b60ef3a2906e",
+        "license": "NASA Open Data / Public Domain",
+        "attribution": "NASA / JPL-Caltech \u2014 Crab Nebula, PIA03606",
+        "notes": "Crab Nebula, 3864x3864, large-bucket JPEG"
+      }
+    },
+    {
+      "name": "nasa_crab_nebula_webp_avif",
+      "bucket": "large",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 3864,
+      "height": 3864,
+      "output_formats": [
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "nasa",
+        "astronomy",
+        "high_res",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "e94453f3c97c17b3c41b502fcec3d1238e87f47d4c71028eb524715022a02177",
+      "source": {
+        "url": "https://images-assets.nasa.gov/image/PIA03606/PIA03606~orig.jpg",
+        "sha256": "c9ff0251e925902c9aeffd9c92fefd06b97b9a99bc24c0c11ce5b60ef3a2906e",
+        "license": "NASA Open Data / Public Domain",
+        "attribution": "NASA / JPL-Caltech \u2014 Crab Nebula, PIA03606",
+        "notes": "Crab Nebula, 3864x3864, large-bucket WebP/AVIF"
+      }
+    },
+    {
+      "name": "nasa_apollo11_moonwalk_jpeg",
+      "bucket": "large",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 3885,
+      "height": 4095,
+      "output_formats": [
+        "jpeg",
+        "webp"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "nasa",
+        "historical",
+        "high_res",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "161bb3daa5d777190020eba7448b2085f1a9ef56230bfd3b9d102646612f846c",
+      "source": {
+        "url": "https://images-assets.nasa.gov/image/as11-40-5931/as11-40-5931~orig.jpg",
+        "sha256": "18a98bde9c7e1e650951db6be0af646914f18a881d1e89d9f2bf7ea8ade04a26",
+        "license": "NASA Open Data / Public Domain",
+        "attribution": "NASA JSC \u2014 Apollo 11 Aldrin on Moon, as11-40-5931",
+        "notes": "Buzz Aldrin on lunar surface, 3885x4095, historical Apollo 11"
+      }
+    },
+    {
+      "name": "nasa_apollo11_moonwalk_avif",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 3885,
+      "height": 4095,
+      "output_formats": [
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "nasa",
+        "historical",
+        "high_res",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "161bb3daa5d777190020eba7448b2085f1a9ef56230bfd3b9d102646612f846c",
+      "source": {
+        "url": "https://images-assets.nasa.gov/image/as11-40-5931/as11-40-5931~orig.jpg",
+        "sha256": "18a98bde9c7e1e650951db6be0af646914f18a881d1e89d9f2bf7ea8ade04a26",
+        "license": "NASA Open Data / Public Domain",
+        "attribution": "NASA JSC \u2014 Apollo 11 Aldrin on Moon, as11-40-5931",
+        "notes": "Buzz Aldrin on lunar surface, 3885x4095, historical Apollo 11"
+      }
+    },
+    {
+      "name": "wikimedia_cat_photo_jpeg_webp",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 1600,
+      "height": 1598,
+      "output_formats": [
+        "jpeg",
+        "webp"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "wikimedia",
+        "animal",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "c84d373ef1ce40a7755249a056b17f04d2ec72611f03fea03de9e2bbc3a64f38",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/3/3a/Cat03.jpg",
+        "sha256": "ec8ff0a6954a5f54e4ad246f0a788d076f675e457bca16a04248718cca3fe631",
+        "license": "CC BY-SA 3.0",
+        "attribution": "Wikimedia Commons \u2014 Cat03.jpg (CC BY-SA 3.0)",
+        "notes": "European cat portrait, 1600x1598"
+      }
+    },
+    {
+      "name": "wikimedia_cat_photo_avif",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 1600,
+      "height": 1598,
+      "output_formats": [
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "wikimedia",
+        "animal",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "c84d373ef1ce40a7755249a056b17f04d2ec72611f03fea03de9e2bbc3a64f38",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/3/3a/Cat03.jpg",
+        "sha256": "ec8ff0a6954a5f54e4ad246f0a788d076f675e457bca16a04248718cca3fe631",
+        "license": "CC BY-SA 3.0",
+        "attribution": "Wikimedia Commons \u2014 Cat03.jpg (CC BY-SA 3.0)",
+        "notes": "European cat portrait, 1600x1598"
+      }
+    },
+    {
+      "name": "wikimedia_earth_apollo17_jpeg",
+      "bucket": "large",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 3000,
+      "height": 3002,
+      "output_formats": [
+        "jpeg"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "wikimedia",
+        "astronomy",
+        "earth",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "36751985bac28cb27d937310a27873853b26556c2d0f48e0b051bb1077fed994",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/9/97/The_Earth_seen_from_Apollo_17.jpg",
+        "sha256": "51049ed4e34514880bfbe39d34e2dd2c56e31f55919e7f4f0b34ef1698cb9f50",
+        "license": "Public domain",
+        "attribution": "NASA / Apollo 17 crew (Harrison Schmitt or Ron Evans) \u2014 The Blue Marble",
+        "notes": "The Blue Marble, 3000x3002, Earth from Apollo 17"
+      }
+    },
+    {
+      "name": "wikimedia_earth_apollo17_webp_avif",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 3000,
+      "height": 3002,
+      "output_formats": [
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "wikimedia",
+        "astronomy",
+        "earth",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "36751985bac28cb27d937310a27873853b26556c2d0f48e0b051bb1077fed994",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/9/97/The_Earth_seen_from_Apollo_17.jpg",
+        "sha256": "51049ed4e34514880bfbe39d34e2dd2c56e31f55919e7f4f0b34ef1698cb9f50",
+        "license": "Public domain",
+        "attribution": "NASA / Apollo 17 crew (Harrison Schmitt or Ron Evans) \u2014 The Blue Marble",
+        "notes": "The Blue Marble, 3000x3002, Earth from Apollo 17"
+      }
+    },
+    {
+      "name": "wikimedia_moraine_lake_jpeg_webp_avif",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 2048,
+      "height": 1536,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "wikimedia",
+        "landscape",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "a4954d0294389f79d93b256f5de165d90c6108769f97a8be225be4a1b5aa5116",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/c/c5/Moraine_Lake_17092005.jpg",
+        "sha256": "adb3041e3ac2de4cf3e7c3d186ea2c39a1a811b4a5fff4f888a6711579833d5f",
+        "license": "Public domain",
+        "attribution": "Gorgo \u2014 Moraine Lake, Banff National Park (Wikimedia Commons, public domain)",
+        "notes": "Moraine Lake, Canadian Rockies, 2048x1536, landscape"
+      }
+    },
+    {
+      "name": "wikimedia_school_of_athens_jpeg",
+      "bucket": "large",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 3820,
+      "height": 2964,
+      "output_formats": [
+        "jpeg"
+      ],
+      "tags": [
+        "real_world",
+        "wikimedia",
+        "art",
+        "painting",
+        "high_res",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "9e2fffb7ed4b3bb738d690936f4466e39396067acdc923200167128f0340b3d4",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/4/49/%22The_School_of_Athens%22_by_Raffaello_Sanzio_da_Urbino.jpg",
+        "sha256": "a351b0b9c429d83e71e992df7d3a433775c37e18ac46ef6f663520b075b17ef4",
+        "license": "Public domain",
+        "attribution": "Raphael \u2014 The School of Athens (1509\u201311), Vatican Museums (Wikimedia Commons)",
+        "notes": "Raphael's School of Athens, 3820x2964, large painting reproduction"
+      }
+    },
+    {
+      "name": "wikimedia_school_of_athens_webp_avif",
+      "bucket": "large",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 3820,
+      "height": 2964,
+      "output_formats": [
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "real_world",
+        "wikimedia",
+        "art",
+        "painting",
+        "high_res",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "9e2fffb7ed4b3bb738d690936f4466e39396067acdc923200167128f0340b3d4",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/4/49/%22The_School_of_Athens%22_by_Raffaello_Sanzio_da_Urbino.jpg",
+        "sha256": "a351b0b9c429d83e71e992df7d3a433775c37e18ac46ef6f663520b075b17ef4",
+        "license": "Public domain",
+        "attribution": "Raphael \u2014 The School of Athens (1509\u201311), Vatican Museums (Wikimedia Commons)",
+        "notes": "Raphael's School of Athens, 3820x2964, large painting reproduction"
+      }
+    },
+    {
+      "name": "wikimedia_taj_mahal_jpeg_webp_avif",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 3144,
+      "height": 2173,
+      "output_formats": [
+        "jpeg",
+        "webp",
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "real_world",
+        "wikimedia",
+        "architecture",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "520aa0e0f0e7f970143ee2ac5b5632a6a9440f5a928600b9f8c6c4d96935a40d",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/b/bd/Taj_Mahal%2C_Agra%2C_India_edit3.jpg",
+        "sha256": "dd503398fe9768a1fc099f20dd2b05ea42197527bdc77f9c418297c54a5a6f2a",
+        "license": "CC BY-SA 3.0",
+        "attribution": "Yann, King of Hearts \u2014 Taj Mahal, Agra, India (CC BY-SA 3.0, Wikimedia Commons)",
+        "notes": "Taj Mahal, 3144x2173, architecture landmark"
+      }
+    },
+    {
+      "name": "wikimedia_rotating_earth_gif",
+      "bucket": "large",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 400,
+      "height": 400,
+      "output_formats": [
+        "gif"
+      ],
+      "tags": [
+        "real_world",
+        "wikimedia",
+        "animated",
+        "astronomy",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "d53fe63ad290566955a798356c32cc79a5300a227484090a433e039d0219655f",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/2/2c/Rotating_earth_%28large%29.gif",
+        "sha256": "b0acdc9a01f91f6123dbff38d4bee59d0d6e4b26071b5c83937b242b6b202378",
+        "license": "Public domain",
+        "attribution": "NASA \u2014 Rotating Earth (large), Wikimedia Commons (public domain)",
+        "notes": "Rotating Earth animated GIF, 400x400, 44 frames"
+      }
+    },
+    {
+      "name": "wikimedia_transparency_demo_png",
+      "bucket": "medium",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 800,
+      "height": 600,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "real_world",
+        "wikimedia",
+        "transparent",
+        "graphic",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "1978f67a9b045198fea36857b911b45afbead5a16603440188f53d02c9a8c973",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png",
+        "sha256": "c4e870d358d64ce677e958c156d0e3fba466993d8e915fc81c5dc64937a9b696",
+        "license": "Public domain",
+        "attribution": "Ed Ayers \u2014 PNG transparency demonstration (Wikimedia Commons, public domain)",
+        "notes": "800x600 RGBA PNG transparency demonstration"
+      }
+    },
+    {
+      "name": "wikimedia_transparency_demo_webp",
+      "bucket": "small",
+      "content_kind": "fetched_photo",
+      "seed": 0,
+      "width": 800,
+      "height": 600,
+      "output_formats": [
+        "webp"
+      ],
+      "tags": [
+        "real_world",
+        "wikimedia",
+        "transparent",
+        "graphic",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "1978f67a9b045198fea36857b911b45afbead5a16603440188f53d02c9a8c973",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png",
+        "sha256": "c4e870d358d64ce677e958c156d0e3fba466993d8e915fc81c5dc64937a9b696",
+        "license": "Public domain",
+        "attribution": "Ed Ayers \u2014 PNG transparency demonstration (Wikimedia Commons, public domain)",
+        "notes": "800x600 RGBA PNG transparency demonstration"
+      }
+    }
+  ]
+}

@@ -48,5 +48,8 @@ tests/corpus/
 # Benchmark dashboard data
 .benchmark-data/
 
+# Bench fetcher cache (hash-pinned downloads, not checked in)
+bench/corpus/cache/
+
 # Custom Ignores
 nul
