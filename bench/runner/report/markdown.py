@@ -131,7 +131,7 @@ def render_run(run: dict[str, Any]) -> str:
 
     if run["mode"] == "quality":
         out.append("")
-        out.append(_render_quality_summary(run["iterations"]))
+        out.append(_render_quality_summary(run["iterations"], config=run.get("config", {})))
 
     if run["mode"] == "load":
         out.append("")
@@ -303,13 +303,17 @@ def _render_accuracy_summary(iterations: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def _render_quality_summary(iterations: list[dict[str, Any]]) -> str:
+def _render_quality_summary(
+    iterations: list[dict[str, Any]], *, config: dict[str, Any] | None = None
+) -> str:
     """Render a quality-summary section for quality-mode runs.
 
     Aggregates ssim, psnr_db, ssimulacra2, butteraugli scores across all
     successful lossy cases, then breaks down per-format medians.
     Only called when ``run['mode'] == 'quality'``.
     """
+    if config is None:
+        config = {}
     # Collect per-case quality metrics from successful (non-failure) rows.
     metric_names = ("ssim", "psnr_db", "ssimulacra2", "butteraugli_max", "butteraugli_3norm")
     all_metrics: dict[str, list[float]] = {m: [] for m in metric_names}
@@ -349,25 +353,34 @@ def _render_quality_summary(iterations: list[dict[str, Any]]) -> str:
             ss2_non_null += 1
 
     n_scored = ssim_total
+    fast_mode = bool(config.get("quality_fast"))
+
     if n_scored == 0:
+        if fast_mode:
+            return "## Quality summary (fast mode — pure-numpy SSIM/PSNR only)\n\n_No quality data available._"
         return "## Quality summary\n\n_No quality data available._"
 
     lines: list[str] = []
-    lines.append("## Quality summary")
+    if fast_mode:
+        lines.append("## Quality summary (fast mode — pure-numpy SSIM/PSNR only)")
+    else:
+        lines.append("## Quality summary")
     lines.append("")
     lines.append(f"_{n_scored} lossy case(s) scored._")
     lines.append("")
 
-    # Missing-binary warnings
-    warnings: list[str] = []
-    if ss2_non_null == 0 and ss2_total > 0:
-        warnings.append("_`ssimulacra2` binary not found; install libjxl tools to enable_")
-    if len(all_metrics["butteraugli_max"]) == 0 and n_scored > 0:
-        warnings.append("_`butteraugli_main` binary not found; install libjxl tools to enable_")
-    for w in warnings:
-        lines.append(f"> {w}")
-    if warnings:
-        lines.append("")
+    # Missing-binary warnings — only fire when subprocess metrics were
+    # actually requested (i.e. not suppressed by fast mode).
+    if not fast_mode:
+        warnings: list[str] = []
+        if ss2_non_null == 0 and ss2_total > 0:
+            warnings.append("_`ssimulacra2` binary not found; install libjxl tools to enable_")
+        if len(all_metrics["butteraugli_max"]) == 0 and n_scored > 0:
+            warnings.append("_`butteraugli_main` binary not found; install libjxl tools to enable_")
+        for w in warnings:
+            lines.append(f"> {w}")
+        if warnings:
+            lines.append("")
 
     # Overall aggregates table
     lines.append("### Overall metrics (all formats)")

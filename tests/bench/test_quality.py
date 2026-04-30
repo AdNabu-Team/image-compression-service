@@ -245,3 +245,115 @@ def test_quality_mode_skips_lossless_format(tmp_path: Path):
     results = run_quality_sync(cases)
     # All PNG cases are filtered → results list is empty
     assert results == [], f"expected empty results for lossless-only cases, got {len(results)} rows"
+
+
+# ---------------------------------------------------------------------------
+# Test 8: --quality-fast skips subprocess metrics (ssimulacra2 + butteraugli)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(
+    not _SMALL_JPEG.exists(),
+    reason="corpus file not present; run `python -m bench.corpus build --manifest core` first",
+)
+def test_quality_fast_skips_subprocess_metrics():
+    """fast=True: ssim/psnr_db populated; ssimulacra2/butteraugli_max null; wall_ms < 500."""
+    from bench.runner.case import Case
+    from bench.runner.modes.quality import run_quality_sync
+
+    case = Case(
+        case_id="photo_perlin_small_jpeg.jpeg@high",
+        name="photo_perlin_small_jpeg",
+        bucket="small",
+        fmt="jpeg",
+        preset="high",
+        quality=40,
+        file_path=_SMALL_JPEG,
+        input_size=_SMALL_JPEG.stat().st_size,
+    )
+
+    results = run_quality_sync([case], fast=True)
+    assert len(results) == 1, f"expected 1 result, got {len(results)}"
+    r = results[0]
+
+    assert "error" not in r, f"unexpected error: {r.get('error')}"
+    q = r.get("quality")
+    assert isinstance(q, dict), f"quality block missing or wrong type: {q!r}"
+
+    # Pure-numpy metrics must be populated
+    assert q["ssim"] is not None, "ssim should be non-null in fast mode"
+    assert 0.0 <= q["ssim"] <= 1.0, f"ssim={q['ssim']} out of [0, 1]"
+    # psnr_db is None only when perfect_match is True (lossless result)
+    if not q.get("perfect_match"):
+        assert q["psnr_db"] is not None, "psnr_db should be non-null for lossy JPEG"
+
+    # Subprocess metrics must be null in fast mode
+    assert (
+        q["ssimulacra2"] is None
+    ), f"ssimulacra2 should be null in fast mode, got {q['ssimulacra2']}"
+    assert (
+        q["butteraugli_max"] is None
+    ), f"butteraugli_max should be null in fast mode, got {q['butteraugli_max']}"
+
+    # Fast mode must be well under subprocess wall time (< 500ms)
+    assert q["wall_ms"] < 500, f"fast mode wall_ms={q['wall_ms']} should be < 500ms"
+
+
+# ---------------------------------------------------------------------------
+# Test 9: --quality-fast CLI flag wires through to config and output JSON
+# ---------------------------------------------------------------------------
+
+
+def test_quality_fast_cli_flag(tmp_path: Path):
+    """CLI --quality-fast flag sets config.metrics and config.quality_fast in output JSON."""
+    import json
+
+    from bench.runner.cli import main
+
+    out_file = tmp_path / "out.json"
+
+    # Only run if the corpus has been built (same guard as test 6/8).
+    if not _SMALL_JPEG.exists():
+        pytest.skip(
+            "corpus file not present; run `python -m bench.corpus build --manifest core` first"
+        )
+
+    exit_code = main(
+        [
+            "run",
+            "--mode",
+            "quality",
+            "--quality-fast",
+            "--manifest",
+            "core",
+            "--fmt",
+            "jpeg",
+            "--bucket",
+            "small",
+            "--out",
+            str(out_file),
+        ]
+    )
+    assert exit_code == 0, f"bench.run exited with non-zero code {exit_code}"
+    assert out_file.exists(), "output JSON was not written"
+
+    data = json.loads(out_file.read_text())
+    cfg = data.get("config", {})
+
+    # Config must reflect fast mode
+    assert cfg.get("quality_fast") is True, f"config.quality_fast not True: {cfg}"
+    assert cfg.get("metrics") == [
+        "ssim",
+        "psnr",
+    ], f"config.metrics should be ['ssim', 'psnr'] in fast mode, got {cfg.get('metrics')}"
+
+    # At least one iteration must have quality data with null subprocess fields
+    quality_iters = [it for it in data.get("iterations", []) if "quality" in it]
+    assert quality_iters, "no quality iterations in output"
+    q = quality_iters[0]["quality"]
+    assert (
+        q["ssimulacra2"] is None
+    ), f"ssimulacra2 should be null in fast mode, got {q['ssimulacra2']}"
+    assert (
+        q["butteraugli_max"] is None
+    ), f"butteraugli_max should be null in fast mode, got {q['butteraugli_max']}"

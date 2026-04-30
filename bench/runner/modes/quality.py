@@ -67,7 +67,7 @@ def _decode_to_array(data: bytes) -> np.ndarray:
     return arr
 
 
-async def _run_one_quality_case(case: Case) -> dict[str, Any]:
+async def _run_one_quality_case(case: Case, *, fast: bool = False) -> dict[str, Any]:
     input_data = case.load()
     config = OptimizationConfig(quality=case.quality)
 
@@ -146,28 +146,29 @@ async def _run_one_quality_case(case: Case) -> dict[str, Any]:
         else:
             psnr_val = psnr_raw
 
-    # Subprocess metrics via temp PNG files
+    # Subprocess metrics via temp PNG files (skipped in fast mode)
     ss2_val: float | None = None
     ba_max: float | None = None
     ba_norm: float | None = None
 
-    with tempfile.TemporaryDirectory(prefix="pare_quality_") as tmpdir:
-        tmp = Path(tmpdir)
-        ref_png = tmp / "ref.png"
-        dist_png = tmp / "dist.png"
+    if not fast:
+        with tempfile.TemporaryDirectory(prefix="pare_quality_") as tmpdir:
+            tmp = Path(tmpdir)
+            ref_png = tmp / "ref.png"
+            dist_png = tmp / "dist.png"
 
-        try:
-            # Save decoded arrays back to lossless PNG so the tools see
-            # exact pixel values (no re-encoding loss).
-            ref_img = Image.fromarray((ref_arr * 255).astype(np.uint8), mode="RGB")
-            dist_img = Image.fromarray((dist_arr * 255).astype(np.uint8), mode="RGB")
-            ref_img.save(str(ref_png), format="PNG", compress_level=1)
-            dist_img.save(str(dist_png), format="PNG", compress_level=1)
+            try:
+                # Save decoded arrays back to lossless PNG so the tools see
+                # exact pixel values (no re-encoding loss).
+                ref_img = Image.fromarray((ref_arr * 255).astype(np.uint8), mode="RGB")
+                dist_img = Image.fromarray((dist_arr * 255).astype(np.uint8), mode="RGB")
+                ref_img.save(str(ref_png), format="PNG", compress_level=1)
+                dist_img.save(str(dist_png), format="PNG", compress_level=1)
 
-            ss2_val = ssimulacra2_score(ref_png, dist_png)
-            ba_max, ba_norm = butteraugli_scores(ref_png, dist_png)
-        except Exception as exc:
-            logger.warning("case %s quality scoring error: %s", case.case_id, exc)
+                ss2_val = ssimulacra2_score(ref_png, dist_png)
+                ba_max, ba_norm = butteraugli_scores(ref_png, dist_png)
+            except Exception as exc:
+                logger.warning("case %s quality scoring error: %s", case.case_id, exc)
 
     q_wall_ms = (time.perf_counter() - q_start) * 1000.0
 
@@ -196,11 +197,17 @@ async def _run_one_quality_case(case: Case) -> dict[str, Any]:
     }
 
 
-async def run_quality(cases: list[Case]) -> list[dict[str, Any]]:
+async def run_quality(cases: list[Case], *, fast: bool = False) -> list[dict[str, Any]]:
     """Sequentially run one optimize + quality score per lossy case.
 
     Lossless cases are filtered out before iteration. Sequential by design
     (matches quick/accuracy mode rationale: clean wall-time isolation).
+
+    Args:
+        cases: benchmark cases to run.
+        fast: when True, skip SSIMULACRA2 + butteraugli subprocess calls and
+              set those fields to null.  Reduces per-case wall time from ~3.5s
+              to ~50ms.  SSIM and PSNR are always computed.
     """
     lossy_cases = [c for c in cases if c.fmt in _LOSSY_FORMATS]
     skipped = len(cases) - len(lossy_cases)
@@ -213,7 +220,7 @@ async def run_quality(cases: list[Case]) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
     for case in lossy_cases:
         try:
-            result = await _run_one_quality_case(case)
+            result = await _run_one_quality_case(case, fast=fast)
             results.append(result)
         except Exception as exc:
             logger.warning("case %s unexpected failure: %s", case.case_id, exc)
@@ -232,6 +239,11 @@ async def run_quality(cases: list[Case]) -> list[dict[str, Any]]:
     return results
 
 
-def run_quality_sync(cases: list[Case]) -> list[dict[str, Any]]:
-    """Synchronous wrapper for use from ``bench.runner.cli``."""
-    return asyncio.run(run_quality(cases))
+def run_quality_sync(cases: list[Case], *, fast: bool = False) -> list[dict[str, Any]]:
+    """Synchronous wrapper for use from ``bench.runner.cli``.
+
+    Args:
+        cases: benchmark cases to run.
+        fast: when True, skip SSIMULACRA2 + butteraugli subprocess calls.
+    """
+    return asyncio.run(run_quality(cases, fast=fast))

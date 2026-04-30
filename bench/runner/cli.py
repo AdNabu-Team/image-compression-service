@@ -68,6 +68,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     print(f"running {args.mode} on {len(cases)} case(s)…", file=sys.stderr)
 
     isolate = getattr(args, "isolate", False)
+    quality_fast = getattr(args, "quality_fast", False)
 
     if isolate and args.mode not in ("timing", "load"):
         print(
@@ -85,6 +86,13 @@ def cmd_run(args: argparse.Namespace) -> int:
         )
         isolate = False
 
+    if quality_fast and args.mode != "quality":
+        print(
+            f"warning: --quality-fast is only meaningful for --mode quality; "
+            f"ignoring for mode={args.mode!r}",
+            file=sys.stderr,
+        )
+
     if args.mode == "quick":
         config = {"warmup": 0, "repeat": 1}
         iterations = run_quick_sync(cases)
@@ -98,9 +106,12 @@ def cmd_run(args: argparse.Namespace) -> int:
         config = {
             "warmup": 0,
             "repeat": 1,
-            "metrics": ["ssim", "psnr", "ssimulacra2", "butteraugli"],
+            "metrics": (
+                ["ssim", "psnr"] if quality_fast else ["ssim", "psnr", "ssimulacra2", "butteraugli"]
+            ),
+            "quality_fast": quality_fast,
         }
-        iterations = run_quality_sync(cases)
+        iterations = run_quality_sync(cases, fast=quality_fast)
     elif args.mode == "load":
         config = {
             "warmup": 0,
@@ -229,6 +240,12 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     p_run.add_argument("--annotate", action="append", default=None)
+    p_run.add_argument(
+        "--quality-fast",
+        action="store_true",
+        help="(quality mode) skip SSIMULACRA2 + butteraugli subprocess calls; "
+        "compute only pure-numpy SSIM + PSNR (~50ms/case vs ~3.5s/case)",
+    )
     # Load-mode flags (silently ignored for other modes).
     p_run.add_argument(
         "--n-concurrent",
