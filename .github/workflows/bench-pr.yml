@@ -117,6 +117,17 @@ jobs:
           body-path: /tmp/comment.md
           edit-mode: replace
 
+      - name: Upload head artifact (always)
+        # Always upload — useful for refreshing the baseline from a
+        # Docker-accurate run, and for post-mortem on regression failures.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-head-${{ github.run_id }}
+          path: reports/_head.json
+          retention-days: 30
+          if-no-files-found: ignore
+
       - name: Fail if regression detected
         if: steps.compare.outputs.no-baseline == 'false' && steps.compare.outputs.compare-exit != '0'
         run: |
