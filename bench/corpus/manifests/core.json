@@ -221,6 +221,498 @@
         "worst_case"
       ],
       "expected_pixel_sha256": "317383ed49027df8c420206774f64da08c70cd566fcb0bf7557deebbb122e536"
+    },
+    {
+      "name": "photo_perlin_tiny_png",
+      "bucket": "tiny",
+      "content_kind": "photo_perlin",
+      "seed": 13,
+      "width": 64,
+      "height": 64,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "6b9bd878d920d9a33eb9ac782d2779a5c9f452c5c8c4455c21e089729e9962ff"
+    },
+    {
+      "name": "photo_perlin_large_png",
+      "bucket": "large",
+      "content_kind": "photo_perlin",
+      "seed": 14,
+      "width": 2400,
+      "height": 1800,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "3f4706d55d84a7a79808c52de1fb7f2ef621e165af9eb9f9737a2ca82f25a4ac"
+    },
+    {
+      "name": "photo_noise_xlarge_png",
+      "bucket": "xlarge",
+      "content_kind": "photo_noise",
+      "seed": 15,
+      "width": 1600,
+      "height": 1200,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "worst_case"
+      ],
+      "expected_pixel_sha256": "7d450e2012c941ec700324d8917a7181fd36f1f45bd16361008a3175a6508739"
+    },
+    {
+      "name": "photo_perlin_tiny_jpeg",
+      "bucket": "tiny",
+      "content_kind": "photo_perlin",
+      "seed": 16,
+      "width": 64,
+      "height": 64,
+      "output_formats": [
+        "jpeg"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "06694082a8a7e00efbfce3506ead1223aa632c5f7504ca9eaede01c9680a1c86"
+    },
+    {
+      "name": "photo_noise_large_jpeg",
+      "bucket": "large",
+      "content_kind": "photo_noise",
+      "seed": 17,
+      "width": 1600,
+      "height": 1200,
+      "output_formats": [
+        "jpeg"
+      ],
+      "tags": [
+        "photo",
+        "worst_case"
+      ],
+      "expected_pixel_sha256": "21a77fe579eb9045a2055b08e54d31797af62e9238713ca3187b3ce4a0009eb8"
+    },
+    {
+      "name": "photo_noise_xlarge_jpeg",
+      "bucket": "xlarge",
+      "content_kind": "photo_noise",
+      "seed": 18,
+      "width": 3000,
+      "height": 2400,
+      "output_formats": [
+        "jpeg"
+      ],
+      "tags": [
+        "photo",
+        "worst_case"
+      ],
+      "expected_pixel_sha256": "6273f98062b7181059a92e15371bc23e7415dd29264b6494c3acda812251fa8d"
+    },
+    {
+      "name": "photo_perlin_tiny_webp",
+      "bucket": "tiny",
+      "content_kind": "photo_perlin",
+      "seed": 19,
+      "width": 64,
+      "height": 64,
+      "output_formats": [
+        "webp"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "98be792ae61ca54b0a0f087c9604b01badc5f0aec2dda3154d380736a992c4e0"
+    },
+    {
+      "name": "photo_noise_medium_webp",
+      "bucket": "medium",
+      "content_kind": "photo_noise",
+      "seed": 20,
+      "width": 1024,
+      "height": 768,
+      "output_formats": [
+        "webp"
+      ],
+      "tags": [
+        "photo",
+        "worst_case"
+      ],
+      "expected_pixel_sha256": "432ad9e2f3b491574eb7d74262e0e09e0ece7e5de3758049f0e2587adacd056b"
+    },
+    {
+      "name": "photo_noise_large_webp",
+      "bucket": "large",
+      "content_kind": "photo_noise",
+      "seed": 21,
+      "width": 2400,
+      "height": 1800,
+      "output_formats": [
+        "webp"
+      ],
+      "tags": [
+        "photo",
+        "worst_case"
+      ],
+      "expected_pixel_sha256": "cd7a97463cf80096c2df5d970a67e80ebd19e0a4111bddf56a5644c595593cd2"
+    },
+    {
+      "name": "photo_noise_xlarge_webp",
+      "bucket": "xlarge",
+      "content_kind": "photo_noise",
+      "seed": 22,
+      "width": 3000,
+      "height": 2400,
+      "output_formats": [
+        "webp"
+      ],
+      "tags": [
+        "photo",
+        "worst_case"
+      ],
+      "expected_pixel_sha256": "d33b2c37afaaf47b3e4a2bf79321ceae975219ddfd1dc2b838fabf3e991154fd"
+    },
+    {
+      "name": "graphic_palette_medium_gif",
+      "bucket": "medium",
+      "content_kind": "graphic_palette",
+      "seed": 23,
+      "width": 768,
+      "height": 576,
+      "output_formats": [
+        "gif"
+      ],
+      "tags": [
+        "graphic",
+        "palette"
+      ],
+      "expected_pixel_sha256": "0e65a8c9557fdca66a035e49d4a594d8c13be8e187d0703066c1db30750fbdfc"
+    },
+    {
+      "name": "animated_redraw_large_gif",
+      "bucket": "large",
+      "content_kind": "animated_redraw",
+      "seed": 24,
+      "width": 1024,
+      "height": 768,
+      "output_formats": [
+        "gif"
+      ],
+      "tags": [
+        "animated",
+        "worst_case"
+      ],
+      "expected_pixel_sha256": "846980b28742ab0fb088a7343995b03a1b8def7710e4bf1e481adabdec795390"
+    },
+    {
+      "name": "photo_perlin_small_bmp",
+      "bucket": "small",
+      "content_kind": "photo_perlin",
+      "seed": 25,
+      "width": 64,
+      "height": 64,
+      "output_formats": [
+        "bmp"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "d891a672c5e03127db155db042cbc9028c65f391c9ba7538940d433d6b227d62"
+    },
+    {
+      "name": "photo_perlin_medium_bmp",
+      "bucket": "medium",
+      "content_kind": "photo_perlin",
+      "seed": 26,
+      "width": 256,
+      "height": 192,
+      "output_formats": [
+        "bmp"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "fbbe6edf1310dfa2bd7dfa171d8b071e3ca07d18099200703be054f6b62156e6"
+    },
+    {
+      "name": "photo_perlin_large_bmp",
+      "bucket": "large",
+      "content_kind": "photo_perlin",
+      "seed": 27,
+      "width": 768,
+      "height": 576,
+      "output_formats": [
+        "bmp"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "dd5b99c92e72b1a8f9101ed925edc6665d6526823ce488fe38f4067311ecd526"
+    },
+    {
+      "name": "photo_perlin_xlarge_bmp",
+      "bucket": "xlarge",
+      "content_kind": "photo_perlin",
+      "seed": 28,
+      "width": 1600,
+      "height": 1200,
+      "output_formats": [
+        "bmp"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "4c417519d3cdbc6c0f68468a941c74874835a6bdb1683a2db0adcc5d94acd615"
+    },
+    {
+      "name": "graphic_palette_tiny_tiff",
+      "bucket": "tiny",
+      "content_kind": "graphic_palette",
+      "seed": 29,
+      "width": 64,
+      "height": 64,
+      "output_formats": [
+        "tiff"
+      ],
+      "tags": [
+        "graphic",
+        "palette"
+      ],
+      "expected_pixel_sha256": "3ba869529b3a8ce503368a6f5b8a24709021096f08f49c5f0e773f9dc977a675"
+    },
+    {
+      "name": "photo_perlin_small_tiff",
+      "bucket": "small",
+      "content_kind": "photo_perlin",
+      "seed": 30,
+      "width": 96,
+      "height": 96,
+      "output_formats": [
+        "tiff"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "c27751dcf4d23a4396b4d7286fb1466284a5678e41f350029896d1d108476c14"
+    },
+    {
+      "name": "photo_perlin_medium_tiff",
+      "bucket": "medium",
+      "content_kind": "photo_perlin",
+      "seed": 31,
+      "width": 384,
+      "height": 288,
+      "output_formats": [
+        "tiff"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "34a152c02cf5970891d70d298996819f8d8528e88420a24a842a88893294c4c1"
+    },
+    {
+      "name": "photo_perlin_large_tiff",
+      "bucket": "large",
+      "content_kind": "photo_perlin",
+      "seed": 32,
+      "width": 1024,
+      "height": 768,
+      "output_formats": [
+        "tiff"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "a4bc2707a8f0c3366c761f24ff0e8821ebbffc2264f03dc15fcc1abde97dfa1b"
+    },
+    {
+      "name": "photo_perlin_xlarge_tiff",
+      "bucket": "xlarge",
+      "content_kind": "photo_perlin",
+      "seed": 33,
+      "width": 1600,
+      "height": 1200,
+      "output_formats": [
+        "tiff"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "9d51c28cb7de8efbe7b55760b37cea8667aaf728722387722eacbb5ddabd9e65"
+    },
+    {
+      "name": "photo_perlin_tiny_heic",
+      "bucket": "tiny",
+      "content_kind": "photo_perlin",
+      "seed": 34,
+      "width": 64,
+      "height": 64,
+      "output_formats": [
+        "heic"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "03aa56f1249327050e209167bb122a3a444156b110d4f96f3091f7b5f4e4671b"
+    },
+    {
+      "name": "photo_perlin_small_heic",
+      "bucket": "small",
+      "content_kind": "photo_perlin",
+      "seed": 35,
+      "width": 256,
+      "height": 192,
+      "output_formats": [
+        "heic"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "6f03449ad001a16c3f37f0601ad74b905729e821f990ddfa6fb298c0b9219dee"
+    },
+    {
+      "name": "photo_perlin_medium_heic",
+      "bucket": "medium",
+      "content_kind": "photo_perlin",
+      "seed": 36,
+      "width": 768,
+      "height": 576,
+      "output_formats": [
+        "heic"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "03bf0473ef6345517b39ba23351b71df4dd936ac2cede53229ae1ab350237ecd"
+    },
+    {
+      "name": "photo_perlin_large_heic",
+      "bucket": "large",
+      "content_kind": "photo_perlin",
+      "seed": 37,
+      "width": 2400,
+      "height": 1800,
+      "output_formats": [
+        "heic"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "19329795c1386aa1a05b16e90ec9ad57fc9bbfd96007437902a22e49054325e5"
+    },
+    {
+      "name": "photo_perlin_xlarge_heic",
+      "bucket": "xlarge",
+      "content_kind": "photo_perlin",
+      "seed": 38,
+      "width": 5000,
+      "height": 4000,
+      "output_formats": [
+        "heic"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "36dc97209c437a54b1a7331bb5319a6df2057388bd285d60381039d78678533c"
+    },
+    {
+      "name": "photo_perlin_tiny_avif",
+      "bucket": "tiny",
+      "content_kind": "photo_perlin",
+      "seed": 39,
+      "width": 64,
+      "height": 64,
+      "output_formats": [
+        "avif"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "15c78cbd49fa08254964af6024bd7cf0c7314cfa611253d0d820e04240f6654d"
+    },
+    {
+      "name": "photo_perlin_small_avif",
+      "bucket": "small",
+      "content_kind": "photo_perlin",
+      "seed": 40,
+      "width": 1024,
+      "height": 768,
+      "output_formats": [
+        "avif"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "12bc239f5c90009e1e6f7dbcf4b061d505f740a1f1313be83dc8543e24c52d7a"
+    },
+    {
+      "name": "photo_noise_medium_avif",
+      "bucket": "medium",
+      "content_kind": "photo_noise",
+      "seed": 41,
+      "width": 512,
+      "height": 384,
+      "output_formats": [
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "worst_case"
+      ],
+      "expected_pixel_sha256": "7772b4a7c4848d2b9afb588d337b19f180747aa2239e2df1f9abc96d486c269d"
+    },
+    {
+      "name": "photo_noise_large_avif",
+      "bucket": "large",
+      "content_kind": "photo_noise",
+      "seed": 42,
+      "width": 2400,
+      "height": 1800,
+      "output_formats": [
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "worst_case"
+      ],
+      "expected_pixel_sha256": "1ed028ccc24cd59fefd9636fc298f9a479d7ef25d9f0c3ef6b2cfeb31ab97e95"
+    },
+    {
+      "name": "photo_noise_xlarge_avif",
+      "bucket": "xlarge",
+      "content_kind": "photo_noise",
+      "seed": 43,
+      "width": 4000,
+      "height": 3000,
+      "output_formats": [
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "worst_case"
+      ],
+      "expected_pixel_sha256": "c4b0169f38e29e11ca9b7e7917677da2c3f1d94c97bddb3fdfa765dbeb13b932"
+    },
+    {
+      "name": "animated_translation_medium_apng",
+      "bucket": "medium",
+      "content_kind": "animated_translation",
+      "seed": 44,
+      "width": 384,
+      "height": 288,
+      "output_formats": [
+        "apng"
+      ],
+      "tags": [
+        "animated"
+      ],
+      "expected_pixel_sha256": "05137f483db8038caddf6d70636aef770df4be86c2c9290a74aeb131e3d4757f"
     }
   ]
 }
