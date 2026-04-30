@@ -129,6 +129,10 @@ def render_run(run: dict[str, Any]) -> str:
         out.append("")
         out.append(_render_accuracy_summary(run["iterations"]))
 
+    if run["mode"] == "quality":
+        out.append("")
+        out.append(_render_quality_summary(run["iterations"]))
+
     return "\n".join(out)
 
 
@@ -291,6 +295,129 @@ def _render_accuracy_summary(iterations: list[dict[str, Any]]) -> str:
         vals = by_fmt[fmt]
         med = percentile(vals, 50)
         lines.append(f"| {fmt} | {len(vals)} | {med:.2f}% |")
+
+    return "\n".join(lines)
+
+
+def _render_quality_summary(iterations: list[dict[str, Any]]) -> str:
+    """Render a quality-summary section for quality-mode runs.
+
+    Aggregates ssim, psnr_db, ssimulacra2, butteraugli scores across all
+    successful lossy cases, then breaks down per-format medians.
+    Only called when ``run['mode'] == 'quality'``.
+    """
+    # Collect per-case quality metrics from successful (non-failure) rows.
+    metric_names = ("ssim", "psnr_db", "ssimulacra2", "butteraugli_max", "butteraugli_3norm")
+    all_metrics: dict[str, list[float]] = {m: [] for m in metric_names}
+    by_fmt: dict[str, dict[str, list[float]]] = {}
+
+    ssim_total = 0
+    ssim_non_null = 0
+    ss2_total = 0
+    ss2_non_null = 0
+
+    for it in iterations:
+        if _is_failure(it):
+            continue
+        q = it.get("quality")
+        if not isinstance(q, dict):
+            continue
+
+        fmt = it.get("format", "?")
+        by_fmt.setdefault(fmt, {m: [] for m in metric_names})
+
+        for mname in metric_names:
+            val = q.get(mname)
+            if val is not None:
+                try:
+                    fval = float(val)
+                except (TypeError, ValueError):
+                    continue
+                all_metrics[mname].append(fval)
+                by_fmt[fmt][mname].append(fval)
+
+        # Track null counts for binary-missing detection
+        ssim_total += 1
+        if q.get("ssim") is not None:
+            ssim_non_null += 1
+        ss2_total += 1
+        if q.get("ssimulacra2") is not None:
+            ss2_non_null += 1
+
+    n_scored = ssim_total
+    if n_scored == 0:
+        return "## Quality summary\n\n_No quality data available._"
+
+    lines: list[str] = []
+    lines.append("## Quality summary")
+    lines.append("")
+    lines.append(f"_{n_scored} lossy case(s) scored._")
+    lines.append("")
+
+    # Missing-binary warnings
+    warnings: list[str] = []
+    if ss2_non_null == 0 and ss2_total > 0:
+        warnings.append("_`ssimulacra2` binary not found; install libjxl tools to enable_")
+    if len(all_metrics["butteraugli_max"]) == 0 and n_scored > 0:
+        warnings.append("_`butteraugli_main` binary not found; install libjxl tools to enable_")
+    for w in warnings:
+        lines.append(f"> {w}")
+    if warnings:
+        lines.append("")
+
+    # Overall aggregates table
+    lines.append("### Overall metrics (all formats)")
+    lines.append("")
+    lines.append("| metric | higher better | n | median | p95 |")
+    lines.append("|---|---|---|---|---|")
+
+    def _fmt_metric(vals: list[float], name: str) -> tuple[str, str]:
+        if not vals:
+            return "-", "-"
+        return f"{percentile(vals, 50):.4f}", f"{percentile(vals, 95):.4f}"
+
+    metric_display = [
+        ("ssim", "yes", all_metrics["ssim"]),
+        ("psnr_db", "yes", all_metrics["psnr_db"]),
+        ("ssimulacra2", "yes", all_metrics["ssimulacra2"]),
+        ("butteraugli_max", "no", all_metrics["butteraugli_max"]),
+        ("butteraugli_3norm", "no", all_metrics["butteraugli_3norm"]),
+    ]
+    for mname, higher, vals in metric_display:
+        med, p95 = _fmt_metric(vals, mname)
+        n = len(vals)
+        lines.append(f"| `{mname}` | {higher} | {n} | {med} | {p95} |")
+
+    lines.append("")
+
+    # Per-format ssimulacra2 breakdown (where available and ≥1 case)
+    if all_metrics["ssimulacra2"]:
+        lines.append("### Per-format median `ssimulacra2` (higher = better quality)")
+        lines.append("")
+        lines.append("| format | n | median | p95 |")
+        lines.append("|---|---|---|---|")
+        for fmt in sorted(by_fmt.keys()):
+            vals = by_fmt[fmt].get("ssimulacra2", [])
+            if not vals:
+                continue
+            med = percentile(vals, 50)
+            p95v = percentile(vals, 95)
+            lines.append(f"| {fmt} | {len(vals)} | {med:.2f} | {p95v:.2f} |")
+        lines.append("")
+
+    # Per-format ssim breakdown
+    if all_metrics["ssim"]:
+        lines.append("### Per-format median `ssim`")
+        lines.append("")
+        lines.append("| format | n | median | p95 |")
+        lines.append("|---|---|---|---|")
+        for fmt in sorted(by_fmt.keys()):
+            vals = by_fmt[fmt].get("ssim", [])
+            if not vals:
+                continue
+            med = percentile(vals, 50)
+            p95v = percentile(vals, 95)
+            lines.append(f"| {fmt} | {len(vals)} | {med:.4f} | {p95v:.4f} |")
 
     return "\n".join(lines)
 
