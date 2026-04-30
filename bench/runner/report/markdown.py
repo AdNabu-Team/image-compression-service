@@ -143,11 +143,16 @@ def _render_metadata(run: dict[str, Any]) -> str:
     cfg = run.get("config", {})
     cfg_pairs = ", ".join(f"{k}={v}" for k, v in cfg.items())
 
+    mode_label = run["mode"]
+    if cfg.get("isolate"):
+        mode_label = f"{mode_label} (isolated, fresh subprocess per iteration)"
+
     lines = [
         f"- **timestamp**: {run['timestamp']}",
         f"- **git**: {git_str}",
         f"- **host**: {run['host']['platform']} ({run['host']['cpu_count']} CPUs)",
         f"- **manifest**: {run['manifest']['name']} (`{run['manifest']['sha256'][:12]}`)",
+        f"- **mode**: {mode_label}",
         f"- **config**: {cfg_pairs}",
     ]
     if ann_lines:

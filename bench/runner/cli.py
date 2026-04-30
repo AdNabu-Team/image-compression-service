@@ -65,6 +65,16 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     print(f"running {args.mode} on {len(cases)} case(s)…", file=sys.stderr)
 
+    isolate = getattr(args, "isolate", False)
+
+    if isolate and args.mode != "timing":
+        print(
+            f"warning: --isolate is only supported for --mode timing; "
+            f"ignoring for mode={args.mode!r}",
+            file=sys.stderr,
+        )
+        isolate = False
+
     if args.mode == "quick":
         config = {"warmup": 0, "repeat": 1}
         iterations = run_quick_sync(cases)
@@ -80,6 +90,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             "repeat": args.repeat,
             "seed": args.seed,
             "shuffle": not args.no_shuffle,
+            "isolate": isolate,
         }
         iterations = run_timing_sync(
             cases,
@@ -87,6 +98,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             repeat=args.repeat,
             seed=args.seed,
             shuffle=not args.no_shuffle,
+            isolate=isolate,
         )
 
     annotations = _parse_annotations(args.annotate or [])
@@ -173,6 +185,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_run.add_argument("--repeat", type=int, default=5)
     p_run.add_argument("--seed", type=int, default=42)
     p_run.add_argument("--no-shuffle", action="store_true")
+    p_run.add_argument(
+        "--isolate",
+        action="store_true",
+        help=(
+            "run each iteration in a fresh Python subprocess "
+            "(clean per-case RSS; +200-400ms/iter cold-start)"
+        ),
+    )
     p_run.add_argument("--annotate", action="append", default=None)
     p_run.set_defaults(func=cmd_run)
 

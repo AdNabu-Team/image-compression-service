@@ -5,14 +5,16 @@ For each case, run `warmup` warmup iterations (discarded) followed by
 includes its iteration index — the reporting layer rolls these up into
 percentile / median / MAD via `bench.runner.stats.summarize_iterations`.
 
-Cases run sequentially. `--isolate` (re-exec each case in a fresh Python
-subprocess) is intentionally deferred to v1: it doubles runtime for
-modest variance reduction, and on Pare's typical workloads (CPU-bound
-subprocesses dominating wall time), the heap-state contamination
-addressed by isolation is small. Without isolate, `parent_peak_rss_kb`
-is a monotonic high-water mark across cases — interpret it as
-"cumulative parent footprint" and use `children_peak_rss_kb` as the
-per-case headline. See bench/CLAUDE.md.
+Cases run sequentially. `--isolate` reruns each iteration in a fresh Python
+subprocess so that ``parent_peak_rss_kb`` reflects per-case allocation rather
+than the cumulative high-water mark that builds up across cases in the same
+process. Without ``--isolate``, ``parent_peak_rss_kb`` is a monotonic
+high-water mark across cases — interpret it as "cumulative parent footprint"
+and use ``children_peak_rss_kb`` as the per-case headline. See bench/CLAUDE.md.
+
+Overhead of ``--isolate``: Python startup + plugin registration takes
+200–400 ms per worker on macOS. For N cases × repeat iterations that's
+N × repeat extra seconds compared to the in-process variant.
 """
 
 from __future__ import annotations
@@ -34,8 +36,17 @@ async def _run_iterations(
     warmup: int,
     repeat: int,
     track_python_allocs: bool,
+    isolate: bool,
 ) -> list[dict[str, Any]]:
     """Run `warmup + repeat` total iterations; return only the measured ones."""
+    if isolate:
+        return await _run_iterations_isolated(
+            case,
+            warmup=warmup,
+            repeat=repeat,
+            track_python_allocs=track_python_allocs,
+        )
+
     for _ in range(warmup):
         try:
             await _run_one_case(case, track_python_allocs=False)
@@ -66,6 +77,40 @@ async def _run_iterations(
     return measured
 
 
+async def _run_iterations_isolated(
+    case: Case,
+    *,
+    warmup: int,
+    repeat: int,
+    track_python_allocs: bool,
+) -> list[dict[str, Any]]:
+    """Like ``_run_iterations`` but each call goes to a fresh subprocess.
+
+    Warmup iterations also use fresh workers (clean cold-start is part of the
+    headline). Workers are spawned sequentially — parallel workers would
+    entangle wall-times, defeating the purpose.
+    """
+    # Import here to avoid circular imports at module level; isolate.py imports
+    # Case, and timing.py imports Case as well, but they don't form a cycle.
+    from bench.runner.isolate import run_iteration_in_worker
+
+    for _ in range(warmup):
+        # Warmup result discarded; still spawn fresh so caches are primed.
+        run_iteration_in_worker(case, track_python_allocs=False)
+
+    measured: list[dict[str, Any]] = []
+    for i in range(repeat):
+        result = run_iteration_in_worker(
+            case,
+            track_python_allocs=track_python_allocs,
+        )
+        result["iteration"] = i
+        if "error" in result:
+            logger.warning("case %s iter %d failed: %s", case.case_id, i, result["error"])
+        measured.append(result)
+    return measured
+
+
 async def run_timing(
     cases: list[Case],
     *,
@@ -74,12 +119,17 @@ async def run_timing(
     seed: int = 42,
     shuffle: bool = True,
     track_python_allocs: bool = False,
+    isolate: bool = False,
 ) -> list[dict[str, Any]]:
     """Run all cases sequentially with warmup + repeat per case.
 
     Order shuffling defends against systematic first-case-is-cold bias
-    (PIL plugin lazy-load, OS page cache populating). Set `shuffle=False`
+    (PIL plugin lazy-load, OS page cache populating). Set ``shuffle=False``
     for reproducible debugging.
+
+    When ``isolate=True`` each (case × iteration) tuple runs in a fresh
+    Python subprocess so ``parent_peak_rss_kb`` is clean per-case rather
+    than cumulative. Each spawn adds ~200–400 ms cold-start overhead.
     """
     ordered: list[Case] = list(cases)
     if shuffle:
@@ -92,6 +142,7 @@ async def run_timing(
             warmup=warmup,
             repeat=repeat,
             track_python_allocs=track_python_allocs,
+            isolate=isolate,
         )
         results.extend(iter_results)
     return results
@@ -105,6 +156,7 @@ def run_timing_sync(
     seed: int = 42,
     shuffle: bool = True,
     track_python_allocs: bool = False,
+    isolate: bool = False,
 ) -> list[dict[str, Any]]:
     return asyncio.run(
         run_timing(
@@ -114,5 +166,6 @@ def run_timing_sync(
             seed=seed,
             shuffle=shuffle,
             track_python_allocs=track_python_allocs,
+            isolate=isolate,
         )
     )
