@@ -7,9 +7,14 @@ digits — enough to rank cases without drowning in noise.
 
 from __future__ import annotations
 
-from typing import Any
+from dataclasses import dataclass
+from statistics import median
+from typing import TYPE_CHECKING, Any
 
 from bench.runner.stats import CaseStats, percentile
+
+if TYPE_CHECKING:
+    from bench.runner.compare import CaseDiff
 
 _SPARK_CHARS = "▁▂▃▄▅▆▇█"
 
@@ -28,6 +33,124 @@ _COMPARE_LABEL_DISPLAY: dict[str, str] = {
 def format_compare_label(label: str) -> str:
     """Return the display string for a CaseDiff label column entry."""
     return _COMPARE_LABEL_DISPLAY.get(label, label)
+
+
+# ---------------------------------------------------------------------------
+# Per-format rollup
+# ---------------------------------------------------------------------------
+
+# Label severity order (higher index = worse).  Used to pick the worst label
+# in a group and to decide the group status icon.
+_LABEL_SEVERITY: dict[str, int] = {
+    "improvement": 0,
+    "ok": 1,
+    "below_threshold": 1,
+    "noise_floor_ok": 1,
+    "noise_floor_regression": 2,
+    "significant": 3,
+}
+
+
+def _extract_format(case_id: str) -> str:
+    """Return the format token from a case_id like ``name.ext@preset``.
+
+    The canonical shape is ``<entry_name>.<fmt>@<preset>`` — e.g.
+    ``photo_perlin_tiny_heic.heic@high``.  We split on ``@``, take the
+    left part, then take the extension after the last ```.```.
+
+    Falls back to ``"unknown"`` rather than raising, so a bad case_id
+    never crashes the rollup.
+    """
+    try:
+        left = case_id.split("@")[0]  # e.g. "photo_perlin_tiny_heic.heic"
+        return left.rsplit(".", 1)[1].lower()  # e.g. "heic"
+    except (IndexError, AttributeError):
+        return "unknown"
+
+
+@dataclass
+class FormatRollup:
+    """Aggregated stats for one image format across all its CaseDiffs."""
+
+    fmt: str
+    n_cases: int
+    median_delta_pct: float
+    worst_delta_pct: float  # most-positive (regression-favoring) delta
+    n_regressions: int
+    n_improvements: int
+    worst_label: str  # highest-severity label in the group
+    status: str  # ❌ / ⚠ / ✅ / ~
+
+
+def _rollup_status(worst_label: str) -> str:
+    """Map the worst label in a format group to a single status glyph."""
+    if worst_label == "significant":
+        return "❌"
+    if worst_label == "noise_floor_regression":
+        return "⚠"
+    if worst_label == "improvement":
+        return "✅"
+    return "~"
+
+
+def build_format_rollup(diffs: "list[CaseDiff]") -> list[FormatRollup]:
+    """Group *diffs* by format and compute per-format summary statistics.
+
+    Returns one :class:`FormatRollup` per distinct format, sorted by status
+    severity (worst first), then by worst_delta_pct descending within each
+    status bucket.
+    """
+    by_fmt: dict[str, list[CaseDiff]] = {}
+    for d in diffs:
+        fmt = _extract_format(d.case_id)
+        by_fmt.setdefault(fmt, []).append(d)
+
+    rollups: list[FormatRollup] = []
+    for fmt, group in by_fmt.items():
+        deltas = [d.delta_pct for d in group]
+        med = float(median(deltas)) if deltas else 0.0
+        worst = max(deltas) if deltas else 0.0
+
+        n_reg = sum(1 for d in group if d.label in ("significant", "noise_floor_regression"))
+        n_imp = sum(1 for d in group if d.label == "improvement")
+
+        worst_label = max(group, key=lambda d: _LABEL_SEVERITY.get(d.label, 0)).label
+
+        rollups.append(
+            FormatRollup(
+                fmt=fmt,
+                n_cases=len(group),
+                median_delta_pct=med,
+                worst_delta_pct=worst,
+                n_regressions=n_reg,
+                n_improvements=n_imp,
+                worst_label=worst_label,
+                status=_rollup_status(worst_label),
+            )
+        )
+
+    # Sort: worst status first, then by worst_delta_pct descending.
+    _status_order = {"❌": 0, "⚠": 1, "~": 2, "✅": 3}
+    rollups.sort(key=lambda r: (_status_order.get(r.status, 99), -r.worst_delta_pct))
+    return rollups
+
+
+def render_format_rollup_table(rollups: list[FormatRollup]) -> str:
+    """Render the per-format summary as a Markdown table string."""
+    lines = [
+        "## Per-format summary",
+        "",
+        "| Format | Cases | Median Δ% | Worst Δ% | Regressions | Improvements | Status |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for r in rollups:
+        med_str = f"{r.median_delta_pct:+.1f}%"
+        worst_str = f"{r.worst_delta_pct:+.1f}%"
+        lines.append(
+            f"| `{r.fmt}` | {r.n_cases} | {med_str} | {worst_str} "
+            f"| {r.n_regressions} | {r.n_improvements} | {r.status} |"
+        )
+    return "\n".join(lines)
 
 
 def _sparkline(samples: list, max_buckets: int = 24) -> str:

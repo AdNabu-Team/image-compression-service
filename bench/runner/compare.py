@@ -25,7 +25,11 @@ from pathlib import Path
 from typing import Any
 
 from bench.runner.report.json_writer import load_run
-from bench.runner.report.markdown import format_compare_label
+from bench.runner.report.markdown import (
+    build_format_rollup,
+    format_compare_label,
+    render_format_rollup_table,
+)
 from bench.runner.stats import (
     cohens_d,
     differs_significantly,
@@ -211,6 +215,16 @@ def render_compare_markdown(result: CompareResult) -> str:
         lines.append("_No common cases to compare._")
         return "\n".join(lines)
 
+    # Per-format rollup table (scannable summary).
+    rollups = build_format_rollup(result.diffs)
+    lines.append(render_format_rollup_table(rollups))
+    lines.append("")
+
+    # Per-case detail collapsed into a <details> block.
+    n = len(result.diffs)
+    lines.append("<details>")
+    lines.append(f"<summary>Per-case detail ({n} cases)</summary>")
+    lines.append("")
     lines.append("| case_id | baseline | head | Δ% | p | d | label |")
     lines.append("|---|---|---|---|---|---|---|")
 
@@ -222,4 +236,6 @@ def render_compare_markdown(result: CompareResult) -> str:
             f"{d.head_median_ms:.1f}ms | {d.delta_pct:+.1f}% | "
             f"{d.p_value:.3f} | {d.cohens_d:+.2f} | {display_label} |"
         )
+    lines.append("")
+    lines.append("</details>")
     return "\n".join(lines)
