@@ -128,46 +128,76 @@ def _build_summary(
 
     # Quality (lossy only)
     if quality is not None:
-        ssim = quality["ssim_p50"]
-        if ssim >= 0.99:
-            verdict = "visually lossless"
-        elif ssim >= 0.97:
-            verdict = "essentially identical"
-        elif ssim >= 0.95:
-            verdict = "very good quality"
-        else:
-            verdict = "acceptable quality"
-        parts.append(f"Output looks {verdict} (SSIM {ssim:.2f}).")
+        q_status = quality["status"]
+        ssim_p50 = quality["ssim_p50"]
+        ssim_worst = quality["ssim_worst"]
+        n_below = quality["n_below"]
+        threshold = quality["threshold"]
 
-    # Speed — find worst-offender bucket
+        if q_status == "ok":
+            # Summarise using median; include worst for context.
+            if ssim_p50 >= 0.99:
+                verdict = "visually lossless"
+            elif ssim_p50 >= 0.97:
+                verdict = "essentially identical"
+            elif ssim_p50 >= 0.95:
+                verdict = "very good quality"
+            else:
+                verdict = "acceptable quality"
+            parts.append(
+                f"Output looks {verdict} (SSIM {ssim_p50:.3f} median, worst {ssim_worst:.3f})."
+            )
+        elif q_status == "warn":
+            parts.append(
+                f"Quality near threshold — median SSIM {ssim_p50:.3f} (worst {ssim_worst:.3f}),"
+                f" {n_below} case(s) below {threshold:.2f}."
+            )
+        else:  # fail
+            parts.append(
+                f"Quality concern — {n_below} case(s) below SSIM {threshold:.2f}"
+                f" (worst {ssim_worst:.3f})."
+            )
+
+    # Speed — find worst-offender bucket among non-ok buckets, fallback to overall worst
     worst_bucket_ms: float = 0.0
     worst_bucket_name: str = ""
-    worst_bucket_status: str = "ok"
     for bucket, info in speed_by_bucket.items():
         if info["p95_ms"] > worst_bucket_ms:
             worst_bucket_ms = info["p95_ms"]
             worst_bucket_name = bucket
-            worst_bucket_status = info["status"]
 
     speed_statuses = [v["status"] for v in speed_by_bucket.values()]
     if all(s == "ok" for s in speed_statuses):
         if worst_bucket_name:
             ms_str = f"{worst_bucket_ms:.0f}ms"
-            parts.append(
-                f"p95 latency within SLO across all sizes ({ms_str} on {worst_bucket_name})."
-            )
+            parts.append(f"Speed within SLO ({ms_str} on {worst_bucket_name}).")
     else:
-        if worst_bucket_status in ("warn", "fail"):
-            ms_str = f"{worst_bucket_ms:.0f}ms"
-            slo = speed_by_bucket[worst_bucket_name]["slo_ms"]
-            parts.append(
-                f"p95 latency {ms_str} on {worst_bucket_name} (SLO: {slo}ms) — check slow encoder."
-            )
+        # Name the worst-offending non-ok bucket explicitly.
+        non_ok_buckets = [
+            (b, info) for b, info in speed_by_bucket.items() if info["status"] != "ok"
+        ]
+        if non_ok_buckets:
+            # Pick highest p95 among the failing ones.
+            worst_b, worst_info = max(non_ok_buckets, key=lambda x: x[1]["p95_ms"])
+            ms_str = f"{worst_info['p95_ms']:.0f}ms"
+            slo = worst_info["slo_ms"]
+            parts.append(f"Speed concern — p95 {ms_str} on {worst_b} (SLO: {slo}ms).")
 
     # Accuracy
     if accuracy is not None:
         p95 = accuracy["size_rel_error_p95"]
-        parts.append(f"Prediction within ±{p95:.0f}% (size_rel_error p95).")
+        acc_status = accuracy["status"]
+        threshold_acc = accuracy["threshold"]
+        if acc_status == "ok":
+            parts.append(f"Prediction within ±{p95:.0f}%.")
+        elif acc_status == "warn":
+            parts.append(
+                f"Prediction accuracy marginal — size_rel_error p95 {p95:.0f}% (threshold {threshold_acc:.0f}%)."
+            )
+        else:  # fail
+            parts.append(
+                f"Prediction off — size_rel_error p95 {p95:.0f}% exceeds {threshold_acc:.0f}% threshold."
+            )
 
     return " ".join(parts)
 

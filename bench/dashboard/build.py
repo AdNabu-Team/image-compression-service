@@ -701,8 +701,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.corpus_root is not None:
         corpus_root: Path | None = Path(args.corpus_root).resolve() if args.corpus_root else None
     else:
-        default_corpus = repo_root / "bench" / "corpus" / "data"
-        corpus_root = default_corpus if default_corpus.exists() else None
+        # Check tests/corpus first (current actual write location), then legacy path.
+        _candidates = [
+            repo_root / "tests" / "corpus",
+            repo_root / "bench" / "corpus" / "data",
+        ]
+        corpus_root = next((p for p in _candidates if p.exists()), None)
     if corpus_root is not None:
         print(f"[dashboard] corpus    : {corpus_root}", file=sys.stderr)
     else:

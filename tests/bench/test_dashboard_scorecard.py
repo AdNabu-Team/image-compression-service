@@ -660,3 +660,169 @@ def test_scorecard_sort_order_fail_first() -> None:
         fail_idx = statuses.index("fail")
         ok_idx = statuses.index("ok")
         assert fail_idx < ok_idx, f"'fail' record not before 'ok': {statuses}"
+
+
+# ---------------------------------------------------------------------------
+# Test 11: Summary text accurately reflects quality/speed/accuracy status (Bug 3 fix)
+# ---------------------------------------------------------------------------
+
+
+def test_summary_quality_ok_mentions_worst_ssim() -> None:
+    """When quality status is ok, summary includes both median and worst SSIM (Bug 3 fix)."""
+    run = _make_pr_run(
+        fmt="jpeg",
+        ssim_values=[0.980, 0.975, 0.972],
+        size_rel_errors=[2.0, 3.0, 4.0],
+        p95_ms=40.0,
+        bucket="small",
+    )
+    records = build_scorecard(run)
+    r = records[0]
+
+    assert r["quality"] is not None
+    assert r["quality"]["status"] == "ok", f"Expected ok quality, got {r['quality']['status']}"
+
+    summary = r["summary"]
+    # Must contain median SSIM and worst SSIM explicitly (not just a vague "very good quality").
+    assert "SSIM" in summary, f"SSIM missing from ok-quality summary: {summary}"
+    assert "worst" in summary, f"'worst' SSIM missing from ok-quality summary: {summary}"
+
+
+def test_summary_quality_warn_names_breach_count() -> None:
+    """When quality is warn, summary names worst SSIM and breach count."""
+    # threshold for "medium" is 0.97; just slightly below → warn zone (>=0.97*0.98=0.9506)
+    run = _make_pr_run(
+        fmt="jpeg",
+        ssim_values=[0.958, 0.960, 0.962],  # worst=0.958 < 0.97 but >=0.97*0.98≈0.9506
+        size_rel_errors=[3.0, 4.0, 5.0],
+        p95_ms=40.0,
+        bucket="small",
+    )
+    records = build_scorecard(run)
+    r = records[0]
+
+    assert r["quality"] is not None
+    q_status = r["quality"]["status"]
+    # If the values land in warn/fail (depends on exact thresholds), check accordingly.
+    if q_status in ("warn", "fail"):
+        summary = r["summary"]
+        assert "SSIM" in summary, f"SSIM missing from {q_status}-quality summary: {summary}"
+        # Must name the worst-case SSIM when not ok.
+        assert (
+            "worst" in summary or "case" in summary
+        ), f"Breach details missing from {q_status}-quality summary: {summary}"
+
+
+def test_summary_quality_fail_names_count_and_worst() -> None:
+    """When quality status is fail, summary names breach count and worst SSIM explicitly."""
+    # threshold for "medium" is 0.97; provide values well below.
+    run = _make_pr_run(
+        fmt="webp",
+        ssim_values=[0.90, 0.88, 0.92],  # all fail threshold 0.97
+        size_rel_errors=[3.0, 4.0, 5.0],
+        p95_ms=40.0,
+        bucket="small",
+    )
+    records = build_scorecard(run)
+    r = records[0]
+
+    assert r["quality"] is not None
+    assert r["quality"]["status"] == "fail", f"Expected fail, got {r['quality']['status']}"
+    n_below = r["quality"]["n_below"]
+    worst = r["quality"]["ssim_worst"]
+
+    summary = r["summary"]
+    # Summary must acknowledge the failure count and worst-case value.
+    assert (
+        "case" in summary or str(n_below) in summary
+    ), f"Breach count missing from fail-quality summary: {summary}"
+    assert (
+        f"{worst:.3f}" in summary or "0.88" in summary or "SSIM" in summary
+    ), f"Worst SSIM not named in fail-quality summary: {summary}"
+    # Must NOT say "looks very good quality" when failing.
+    assert (
+        "very good quality" not in summary
+    ), f"Summary says 'very good quality' despite fail status: {summary}"
+    assert (
+        "essentially identical" not in summary
+    ), f"Summary says 'essentially identical' despite fail status: {summary}"
+
+
+def test_summary_speed_ok_uses_concise_phrasing() -> None:
+    """When speed is ok, summary uses concise 'within SLO' phrasing."""
+    run = _make_pr_run(
+        fmt="jpeg",
+        ssim_values=[0.975, 0.973, 0.980],
+        size_rel_errors=[3.0, 4.0, 5.0],
+        p95_ms=40.0,  # well within small SLO 500ms
+        bucket="small",
+    )
+    records = build_scorecard(run)
+    r = records[0]
+
+    assert r["speed_by_bucket"]["small"]["status"] == "ok"
+    summary = r["summary"]
+    assert "SLO" in summary, f"SLO mention missing from ok-speed summary: {summary}"
+
+
+def test_summary_speed_warn_or_fail_names_bucket() -> None:
+    """When speed is warn/fail, summary names the offending bucket and values."""
+    run = _make_pr_run(
+        fmt="jpeg",
+        ssim_values=[0.975, 0.973, 0.980],
+        size_rel_errors=[3.0, 4.0, 5.0],
+        p95_ms=9999.0,  # far above small SLO 500ms
+        bucket="small",
+    )
+    records = build_scorecard(run)
+    r = records[0]
+
+    bucket_status = r["speed_by_bucket"]["small"]["status"]
+    assert bucket_status in ("warn", "fail"), f"Expected warn/fail, got {bucket_status}"
+
+    summary = r["summary"]
+    assert "small" in summary, f"Bucket name 'small' missing from speed-fail summary: {summary}"
+    assert "SLO" in summary, f"SLO missing from speed-fail summary: {summary}"
+
+
+def test_summary_accuracy_ok_phrasing() -> None:
+    """When accuracy is ok, summary uses terse 'Prediction within' phrasing."""
+    run = _make_pr_run(
+        fmt="jpeg",
+        ssim_values=[0.975, 0.973, 0.980],
+        size_rel_errors=[2.0, 3.0, 4.0],  # well within threshold ~15%
+        p95_ms=40.0,
+        bucket="small",
+    )
+    records = build_scorecard(run)
+    r = records[0]
+
+    assert r["accuracy"] is not None
+    assert r["accuracy"]["status"] == "ok"
+    summary = r["summary"]
+    assert (
+        "Prediction" in summary or "prediction" in summary
+    ), f"Prediction phrase missing from ok-accuracy summary: {summary}"
+
+
+def test_summary_accuracy_fail_names_actual_error() -> None:
+    """When accuracy is fail, summary names the actual p95 error and threshold."""
+    # ESTIMATION_SIZE_REL_ERROR p95_max is typically ~15%; we supply 50% errors to force fail.
+    run = _make_pr_run(
+        fmt="jpeg",
+        ssim_values=[0.975, 0.973, 0.980],
+        size_rel_errors=[50.0, 55.0, 60.0],  # far above threshold
+        p95_ms=40.0,
+        bucket="small",
+    )
+    records = build_scorecard(run)
+    r = records[0]
+
+    assert r["accuracy"] is not None
+    acc_status = r["accuracy"]["status"]
+    if acc_status in ("warn", "fail"):
+        summary = r["summary"]
+        # Must mention prediction failure specifically (not just generic text).
+        assert (
+            "Prediction" in summary or "prediction" in summary
+        ), f"Prediction mention missing from {acc_status}-accuracy summary: {summary}"

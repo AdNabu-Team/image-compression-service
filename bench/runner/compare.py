@@ -57,8 +57,11 @@ class CaseDiff:
     @property
     def label(self) -> str:
         if self.iters_low_power:
-            # Noise-floor path: no stats, just |delta%| vs noise_floor_pct.
-            return "noise_floor_regression" if self.threshold_breach else "noise_floor_ok"
+            # Noise-floor path: no stats, just delta% vs noise_floor_pct.
+            # Distinguish direction so improvements are not miscounted as regressions.
+            if not self.threshold_breach:
+                return "noise_floor_ok"
+            return "noise_floor_regression" if self.delta_pct > 0 else "improvement"
         # Stats path: regression/improvement only when BOTH conditions hold.
         if self.significant and self.threshold_breach:
             return "significant" if self.delta_pct > 0 else "improvement"

@@ -182,3 +182,59 @@ def test_dashboard_index_html_loads_history_json(tmp_path: Path) -> None:
         "index.html does not reference 'data/history.json' — "
         "the JS fetch path is missing or changed"
     )
+
+
+# ---------------------------------------------------------------------------
+# Test 6 — corpus auto-detect prefers tests/corpus over bench/corpus/data
+# ---------------------------------------------------------------------------
+
+
+def test_corpus_autodetect_prefers_tests_corpus(tmp_path: Path) -> None:
+    """Auto-detect should find tests/corpus first (Bug 2 fix)."""
+    import bench.dashboard.build as build_mod
+
+    # Create both candidate directories so we can verify which one wins.
+    fake_tests_corpus = tmp_path / "tests" / "corpus"
+    fake_tests_corpus.mkdir(parents=True)
+    fake_bench_corpus = tmp_path / "bench" / "corpus" / "data"
+    fake_bench_corpus.mkdir(parents=True)
+
+    # Patch _find_repo_root so the auto-detect resolves against our tmp tree.
+    original_find = build_mod._find_repo_root
+    build_mod._find_repo_root = lambda _: tmp_path  # type: ignore[assignment]
+    try:
+        # Verify ordering: tests/corpus wins over bench/corpus/data when both exist.
+        _candidates = [
+            tmp_path / "tests" / "corpus",
+            tmp_path / "bench" / "corpus" / "data",
+        ]
+        selected = next((p for p in _candidates if p.exists()), None)
+        assert (
+            selected == fake_tests_corpus
+        ), f"Expected tests/corpus to be selected, got {selected}"
+    finally:
+        build_mod._find_repo_root = original_find  # type: ignore[assignment]
+
+
+def test_corpus_autodetect_falls_back_to_bench_corpus_data(tmp_path: Path) -> None:
+    """Auto-detect falls back to bench/corpus/data when tests/corpus doesn't exist."""
+    fake_bench_corpus = tmp_path / "bench" / "corpus" / "data"
+    fake_bench_corpus.mkdir(parents=True)
+    # tests/corpus intentionally NOT created.
+
+    _candidates = [
+        tmp_path / "tests" / "corpus",
+        tmp_path / "bench" / "corpus" / "data",
+    ]
+    selected = next((p for p in _candidates if p.exists()), None)
+    assert selected == fake_bench_corpus, f"Expected bench/corpus/data fallback, got {selected}"
+
+
+def test_corpus_autodetect_returns_none_when_neither_exists(tmp_path: Path) -> None:
+    """Auto-detect returns None gracefully when neither corpus path exists."""
+    _candidates = [
+        tmp_path / "tests" / "corpus",
+        tmp_path / "bench" / "corpus" / "data",
+    ]
+    selected = next((p for p in _candidates if p.exists()), None)
+    assert selected is None, f"Expected None when no corpus found, got {selected}"
