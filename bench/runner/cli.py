@@ -30,6 +30,7 @@ from bench.runner.compare import compare, render_compare_markdown
 from bench.runner.modes.accuracy import run_accuracy_sync
 from bench.runner.modes.load import run_load_sync
 from bench.runner.modes.memory import run_memory_sync
+from bench.runner.modes.pr import run_pr_sync
 from bench.runner.modes.quality import run_quality_sync
 from bench.runner.modes.quick import run_quick_sync
 from bench.runner.modes.timing import run_timing_sync
@@ -77,7 +78,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     isolate = getattr(args, "isolate", False)
     quality_fast = getattr(args, "quality_fast", False)
 
-    if isolate and args.mode not in ("timing", "load"):
+    if isolate and args.mode not in ("timing", "load", "pr"):
         print(
             f"warning: --isolate is only supported for --mode timing; "
             f"ignoring for mode={args.mode!r}",
@@ -93,9 +94,9 @@ def cmd_run(args: argparse.Namespace) -> int:
         )
         isolate = False
 
-    if quality_fast and args.mode != "quality":
+    if quality_fast and args.mode not in ("quality", "pr"):
         print(
-            f"warning: --quality-fast is only meaningful for --mode quality; "
+            f"warning: --quality-fast is only meaningful for --mode quality or pr; "
             f"ignoring for mode={args.mode!r}",
             file=sys.stderr,
         )
@@ -134,6 +135,22 @@ def cmd_run(args: argparse.Namespace) -> int:
             semaphore_size=args.semaphore_size,
             queue_depth=args.queue_depth,
             memory_budget_mb=args.memory_budget_mb,
+        )
+    elif args.mode == "pr":
+        config = {
+            "warmup": args.warmup,
+            "repeat": args.repeat,
+            "stages": ["estimate", "optimize", "quality", "timing"],
+            "quality_fast": quality_fast,
+            "metrics": (
+                ["ssim", "psnr"] if quality_fast else ["ssim", "psnr", "ssimulacra2", "butteraugli"]
+            ),
+        }
+        iterations = run_pr_sync(
+            cases,
+            warmup=args.warmup,
+            repeat=args.repeat,
+            fast_quality=quality_fast,
         )
     else:  # timing
         config = {
@@ -227,7 +244,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_run = sub.add_parser("run", help="execute a benchmark run")
     p_run.add_argument(
         "--mode",
-        choices=("quick", "timing", "memory", "accuracy", "quality", "load"),
+        choices=("quick", "timing", "memory", "accuracy", "quality", "load", "pr"),
         default="timing",
     )
     p_run.add_argument("--manifest", default="core")

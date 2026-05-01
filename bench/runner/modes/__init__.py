@@ -11,4 +11,7 @@ quality  — pure-numpy SSIM/PSNR + ssimulacra2/butteraugli on lossy
            outputs; `--quality-fast` skips the subprocess metrics.
 load     — N concurrent requests per case through a fresh CompressionGate;
            measures throughput, 503 rate, latency tail under contention.
+pr       — combined timing + accuracy + quality in a single pass per case.
+           Default mode for the manual bench.yml workflow. Produces one
+           JSON with all three signal categories per case.
 """

@@ -18,6 +18,18 @@ if TYPE_CHECKING:
 
 _SPARK_CHARS = "▁▂▃▄▅▆▇█"
 
+# ---------------------------------------------------------------------------
+# PR-mode quality thresholds — per preset SSIM floor.
+# Cases below their preset's threshold are counted as failures.
+# ---------------------------------------------------------------------------
+PR_SSIM_THRESHOLD: dict[str, float] = {
+    "high": 0.95,
+    "medium": 0.97,
+    "low": 0.99,
+}
+# Default when preset can't be determined.
+PR_SSIM_DEFAULT_THRESHOLD: float = 0.97
+
 # Maps CaseDiff.label values to human-readable display strings for the
 # comparison table.  Keep non-regressions as "~" so the table stays scannable.
 _COMPARE_LABEL_DISPLAY: dict[str, str] = {
@@ -275,6 +287,16 @@ def render_run(run: dict[str, Any]) -> str:
     if run["mode"] == "load":
         out.append("")
         out.append(_render_load_summary(run))
+
+    if run["mode"] == "pr":
+        out.append("")
+        out.append(_render_pr_timing_summary(stats))
+        out.append("")
+        out.append(_render_pr_quality_summary(run["iterations"], config=run.get("config", {})))
+        out.append("")
+        out.append(_render_pr_accuracy_summary(run["iterations"]))
+        out.append("")
+        out.append(_render_pr_per_case_detail(run["iterations"], stats))
 
     return "\n".join(out)
 
@@ -675,6 +697,251 @@ def _render_load_summary(run: dict[str, Any]) -> str:
             med_or = percentile(ors, 50) if ors else 0.0
             lines.append(f"| {fmt} | {len(tps)} | {med_tp:.1f} req/s | {med_or:.1%} |")
 
+    return "\n".join(lines)
+
+
+def _render_pr_timing_summary(stats: list[CaseStats]) -> str:
+    """Render a per-format timing summary for pr-mode runs.
+
+    Groups CaseStats by format, computes p50/p95 wall_ms and median
+    reduction% across cases in each format group.
+    """
+    if not stats:
+        return "## Per-format timing summary\n\n_No timing data available._"
+
+    by_fmt: dict[str, list[CaseStats]] = {}
+    for s in stats:
+        by_fmt.setdefault(s.format, []).append(s)
+
+    lines: list[str] = []
+    lines.append("## Per-format timing summary")
+    lines.append("")
+    lines.append("| Format | Cases | p50 | p95 | Median reduction% |")
+    lines.append("|---|---|---|---|---|")
+
+    for fmt in sorted(by_fmt.keys()):
+        group = by_fmt[fmt]
+        p50s = [s.p50_ms for s in group]
+        p95s = [s.p95_ms for s in group]
+        reds = [s.reduction_pct for s in group]
+        fmt_p50 = percentile(p50s, 50)
+        fmt_p95 = percentile(p95s, 95)
+        fmt_red = percentile(reds, 50)
+        lines.append(
+            f"| `{fmt}` | {len(group)} | {_fmt_ms(fmt_p50)} | {_fmt_ms(fmt_p95)} | {fmt_red:.1f}% |"
+        )
+
+    return "\n".join(lines)
+
+
+def _ssim_threshold_for(preset: str) -> float:
+    """Return the SSIM quality threshold for a given preset name."""
+    return PR_SSIM_THRESHOLD.get(preset.lower(), PR_SSIM_DEFAULT_THRESHOLD)
+
+
+def _render_pr_quality_summary(
+    iterations: list[dict[str, Any]], *, config: dict[str, Any] | None = None
+) -> str:
+    """Render a per-format quality summary for pr-mode runs (lossy only).
+
+    Aggregates SSIM and PSNR across all successful lossy cases, grouping
+    by format. Counts cases whose SSIM falls below their preset threshold.
+    """
+    if config is None:
+        config = {}
+    fast_mode = bool(config.get("quality_fast"))
+
+    # De-duplicate: pr mode attaches quality to every timing iteration;
+    # collect one quality record per case_id (first iteration is enough).
+    seen: set[str] = set()
+    quality_rows: list[dict[str, Any]] = []
+    for it in iterations:
+        if _is_failure(it):
+            continue
+        q = it.get("quality")
+        if not isinstance(q, dict):
+            continue
+        cid = it.get("case_id", "")
+        if cid in seen:
+            continue
+        seen.add(cid)
+        quality_rows.append(it)
+
+    by_fmt: dict[str, dict[str, Any]] = {}
+    for it in quality_rows:
+        fmt = it.get("format", "?")
+        preset = it.get("preset", "")
+        q = it["quality"]
+        ssim_val = q.get("ssim")
+        psnr_val = q.get("psnr_db")
+        threshold = _ssim_threshold_for(preset)
+
+        group = by_fmt.setdefault(
+            fmt,
+            {
+                "ssims": [],
+                "psnrs": [],
+                "below_threshold": 0,
+                "total": 0,
+            },
+        )
+        group["total"] += 1
+        if ssim_val is not None:
+            group["ssims"].append(float(ssim_val))
+            if float(ssim_val) < threshold:
+                group["below_threshold"] += 1
+        if psnr_val is not None:
+            group["psnrs"].append(float(psnr_val))
+
+    title = "## Per-format quality summary — lossy only"
+    if fast_mode:
+        title += " (fast mode — SSIM/PSNR only)"
+
+    if not by_fmt:
+        return f"{title}\n\n_No lossy quality data available (lossless-only run?)._"
+
+    lines: list[str] = []
+    lines.append(title)
+    lines.append("")
+    lines.append("_SSIM thresholds: HIGH preset ≥ 0.95, MEDIUM ≥ 0.97, LOW ≥ 0.99._")
+    lines.append("")
+    lines.append("| Format | Cases | SSIM p50 | SSIM p05 (worst) | PSNR p50 dB | Below threshold |")
+    lines.append("|---|---|---|---|---|---|")
+
+    for fmt in sorted(by_fmt.keys()):
+        g = by_fmt[fmt]
+        ssims = g["ssims"]
+        psnrs = g["psnrs"]
+        ssim_p50 = f"{percentile(ssims, 50):.4f}" if ssims else "-"
+        ssim_p05 = f"{percentile(ssims, 5):.4f}" if ssims else "-"
+        psnr_p50 = f"{percentile(psnrs, 50):.1f}dB" if psnrs else "-"
+        below = g["below_threshold"]
+        total = g["total"]
+        below_str = f"{below}/{total}" if below > 0 else f"0/{total}"
+        lines.append(f"| `{fmt}` | {total} | {ssim_p50} | {ssim_p05} | {psnr_p50} | {below_str} |")
+
+    return "\n".join(lines)
+
+
+def _render_pr_accuracy_summary(iterations: list[dict[str, Any]]) -> str:
+    """Render a per-format estimation accuracy summary for pr-mode runs."""
+    # De-duplicate: pr mode attaches accuracy to every timing iteration.
+    seen: set[str] = set()
+    acc_rows: list[dict[str, Any]] = []
+    for it in iterations:
+        if _is_failure(it):
+            continue
+        acc = it.get("accuracy")
+        if not isinstance(acc, dict):
+            continue
+        cid = it.get("case_id", "")
+        if cid in seen:
+            continue
+        seen.add(cid)
+        acc_rows.append(it)
+
+    if not acc_rows:
+        return "## Per-format estimation accuracy\n\n_No accuracy data available._"
+
+    by_fmt: dict[str, dict[str, list[float]]] = {}
+    for it in acc_rows:
+        fmt = it.get("format", "?")
+        acc = it["accuracy"]
+        size_rel = acc.get("size_rel_error_pct")
+        red_abs = acc.get("reduction_abs_error_pct_abs")
+        if size_rel is None or red_abs is None:
+            continue
+        g = by_fmt.setdefault(fmt, {"size_rel": [], "red_abs": []})
+        g["size_rel"].append(abs(float(size_rel)))
+        g["red_abs"].append(float(red_abs))
+
+    lines: list[str] = []
+    lines.append("## Per-format estimation accuracy")
+    lines.append("")
+    lines.append(
+        "_`size_rel_error` = |predicted_size − actual_size| / actual_size × 100. "
+        "`reduction_error` = |predicted_reduction% − actual_reduction%|._"
+    )
+    lines.append("")
+    lines.append(
+        "| Format | Cases | size_rel_error p50 | size_rel_error p95 "
+        "| reduction_error p50 | reduction_error p95 |"
+    )
+    lines.append("|---|---|---|---|---|---|")
+
+    for fmt in sorted(by_fmt.keys()):
+        g = by_fmt[fmt]
+        sr = g["size_rel"]
+        ra = g["red_abs"]
+        sr_p50 = f"{percentile(sr, 50):.2f}%" if sr else "-"
+        sr_p95 = f"{percentile(sr, 95):.2f}%" if sr else "-"
+        ra_p50 = f"{percentile(ra, 50):.2f}%" if ra else "-"
+        ra_p95 = f"{percentile(ra, 95):.2f}%" if ra else "-"
+        n = len(sr)
+        lines.append(f"| `{fmt}` | {n} | {sr_p50} | {sr_p95} | {ra_p50} | {ra_p95} |")
+
+    return "\n".join(lines)
+
+
+def _render_pr_per_case_detail(iterations: list[dict[str, Any]], stats: list[CaseStats]) -> str:
+    """Render a collapsed per-case detail table for pr-mode runs."""
+    # Index stats by case_id for quick lookup.
+    stats_by_id: dict[str, CaseStats] = {s.case_id: s for s in stats}
+
+    # De-duplicate: take the first iteration per case_id.
+    seen: set[str] = set()
+    rows: list[dict[str, Any]] = []
+    for it in iterations:
+        cid = it.get("case_id", "")
+        if cid in seen:
+            continue
+        seen.add(cid)
+        rows.append(it)
+
+    n = len(rows)
+    lines: list[str] = []
+    lines.append(f"<details><summary>Per-case detail ({n} cases)</summary>")
+    lines.append("")
+    lines.append(
+        "| case_id | p50 | p95 | red% | method | " "SSIM | PSNR | size_rel_err p50 | red_err |"
+    )
+    lines.append("|---|---|---|---|---|---|---|---|---|")
+
+    for it in sorted(rows, key=lambda x: (x.get("format", ""), x.get("preset", ""))):
+        cid = it.get("case_id", "?")
+        s = stats_by_id.get(cid)
+        p50_str = _fmt_ms(s.p50_ms) if s else "-"
+        p95_str = _fmt_ms(s.p95_ms) if s else "-"
+        red_str = f"{it.get('reduction_pct', 0):.1f}%"
+        method = (it.get("method") or "-")[:20]
+
+        q = it.get("quality")
+        if isinstance(q, dict):
+            ssim_val = q.get("ssim")
+            psnr_val = q.get("psnr_db")
+            ssim_str = f"{ssim_val:.4f}" if ssim_val is not None else "-"
+            psnr_str = f"{psnr_val:.1f}dB" if psnr_val is not None else "-"
+        else:
+            ssim_str = "n/a"
+            psnr_str = "n/a"
+
+        acc = it.get("accuracy")
+        if isinstance(acc, dict):
+            sr = acc.get("size_rel_error_pct")
+            ra = acc.get("reduction_abs_error_pct_abs")
+            sr_str = f"{sr:+.2f}%" if sr is not None else "-"
+            ra_str = f"{ra:.2f}%" if ra is not None else "-"
+        else:
+            sr_str = "-"
+            ra_str = "-"
+
+        lines.append(
+            f"| `{cid}` | {p50_str} | {p95_str} | {red_str} | {method} "
+            f"| {ssim_str} | {psnr_str} | {sr_str} | {ra_str} |"
+        )
+
+    lines.append("")
+    lines.append("</details>")
     return "\n".join(lines)
 
 
