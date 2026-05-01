@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from statistics import median
 from typing import TYPE_CHECKING, Any
 
+from bench.runner.report.thresholds import SSIM_DEFAULT, SSIM_THRESHOLDS
 from bench.runner.stats import CaseStats, percentile
 
 if TYPE_CHECKING:
@@ -19,16 +20,11 @@ if TYPE_CHECKING:
 _SPARK_CHARS = "▁▂▃▄▅▆▇█"
 
 # ---------------------------------------------------------------------------
-# PR-mode quality thresholds — per preset SSIM floor.
-# Cases below their preset's threshold are counted as failures.
+# PR-mode quality thresholds — imported from thresholds.py (single source of truth).
+# Aliases kept for backward compat with any code that imported these names.
 # ---------------------------------------------------------------------------
-PR_SSIM_THRESHOLD: dict[str, float] = {
-    "high": 0.95,
-    "medium": 0.97,
-    "low": 0.99,
-}
-# Default when preset can't be determined.
-PR_SSIM_DEFAULT_THRESHOLD: float = 0.97
+PR_SSIM_THRESHOLD: dict[str, float] = SSIM_THRESHOLDS
+PR_SSIM_DEFAULT_THRESHOLD: float = SSIM_DEFAULT
 
 # Maps CaseDiff.label values to human-readable display strings for the
 # comparison table.  Keep non-regressions as "~" so the table stays scannable.
@@ -736,7 +732,7 @@ def _render_pr_timing_summary(stats: list[CaseStats]) -> str:
 
 def _ssim_threshold_for(preset: str) -> float:
     """Return the SSIM quality threshold for a given preset name."""
-    return PR_SSIM_THRESHOLD.get(preset.lower(), PR_SSIM_DEFAULT_THRESHOLD)
+    return SSIM_THRESHOLDS.get(preset.lower(), SSIM_DEFAULT)
 
 
 def _render_pr_quality_summary(

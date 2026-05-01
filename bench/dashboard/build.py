@@ -5,10 +5,15 @@ per-format trend data, and renders ``index.html`` + ``data/history.json`` into
 ``dashboard/dist/``.  Idempotent — safe to run repeatedly; output dir is wiped
 each run.
 
+The dashboard also renders a per-format **scorecard** at the top of the page,
+reading the current baseline (or a file passed via ``--baseline``) to show
+compression, speed, quality, and accuracy at a glance.
+
 CLI::
 
     python -m bench.dashboard.build [--out-dir dashboard/dist] [--limit 100]
     python -m bench.dashboard.build --repo /path/to/repo --out-dir /tmp/dash
+    python -m bench.dashboard.build --baseline /tmp/pr_smoke.json --out-dir /tmp/dash
 """
 
 from __future__ import annotations
@@ -22,6 +27,8 @@ import sys
 from pathlib import Path
 from statistics import median
 from typing import Any
+
+from bench.dashboard.scorecard import build_kpis, build_scorecard, load_scorecard_data
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -245,21 +252,65 @@ def _template_dir() -> Path:
     return Path(__file__).parent / "template"
 
 
-def render_output(history: dict[str, Any], out_dir: Path) -> None:
+def render_output(
+    history: dict[str, Any],
+    out_dir: Path,
+    scorecard_run: dict[str, Any] | None = None,
+) -> None:
     """Write ``index.html`` and ``data/history.json`` to *out_dir*.
 
     Wipes *out_dir* first so repeated runs stay idempotent.
+
+    If *scorecard_run* is provided (a parsed run JSON), scorecard data is
+    embedded inline in the HTML as a JS variable for immediate first-paint
+    rendering without an extra network fetch.
     """
     if out_dir.exists():
         shutil.rmtree(out_dir)
     out_dir.mkdir(parents=True)
     (out_dir / "data").mkdir()
 
-    # Copy the HTML template verbatim (JS reads history.json at runtime).
-    src_html = _template_dir() / "index.html"
-    shutil.copy(src_html, out_dir / "index.html")
+    # Build scorecard payload (or empty if no data).
+    if scorecard_run is not None:
+        scorecard_records = build_scorecard(scorecard_run)
+        kpis = build_kpis(scorecard_records)
+        git_info = scorecard_run.get("git", {})
+        run_meta = {
+            "mode": scorecard_run.get("mode", "unknown"),
+            "timestamp": scorecard_run.get("timestamp", ""),
+            "branch": git_info.get("branch", ""),
+            "commit": git_info.get("commit", "")[:7],
+            "is_pr_mode": scorecard_run.get("mode") == "pr"
+            or any(
+                "quality" in it or "accuracy" in it
+                for it in scorecard_run.get("iterations", [])[:1]
+            ),
+        }
+    else:
+        scorecard_records = []
+        kpis = {
+            "avg_reduction_pct": 0.0,
+            "quality_green": 0,
+            "quality_total": 0,
+            "speed_green": 0,
+            "speed_total": 0,
+            "accuracy_green": 0,
+            "accuracy_total": 0,
+        }
+        run_meta = {"mode": "", "timestamp": "", "branch": "", "commit": "", "is_pr_mode": False}
 
-    # Write the data file.
+    scorecard_json = json.dumps(
+        {"records": scorecard_records, "kpis": kpis, "meta": run_meta}, separators=(",", ":")
+    )
+
+    # Load HTML template and embed scorecard JSON inline (avoids extra fetch for first paint).
+    src_html = _template_dir() / "index.html"
+    html = src_html.read_text(encoding="utf-8")
+    html = html.replace("__SCORECARD_JSON__", scorecard_json)
+
+    (out_dir / "index.html").write_text(html, encoding="utf-8")
+
+    # Write the trend data file.
     json_path = out_dir / "data" / "history.json"
     json_path.write_text(json.dumps(history, indent=2) + "\n", encoding="utf-8")
 
@@ -281,10 +332,12 @@ def _no_baseline_page(out_dir: Path) -> None:
         json.dumps(placeholder, indent=2) + "\n", encoding="utf-8"
     )
 
-    # Still copy the template so a valid page is served.
+    # Still copy the template so a valid page is served (with no scorecard data).
     src_html = _template_dir() / "index.html"
     if src_html.exists():
-        shutil.copy(src_html, out_dir / "index.html")
+        html = src_html.read_text(encoding="utf-8")
+        html = html.replace("__SCORECARD_JSON__", "null")
+        (out_dir / "index.html").write_text(html, encoding="utf-8")
     else:
         (out_dir / "index.html").write_text(
             "<!doctype html><html><body>"
@@ -330,6 +383,14 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Path to the git repo root. Defaults to auto-detection from CWD.",
     )
+    parser.add_argument(
+        "--baseline",
+        default=None,
+        help=(
+            "Path to a bench run JSON to use as scorecard data source. "
+            "Defaults to reports/baseline.core.json relative to the repo root."
+        ),
+    )
     args = parser.parse_args(argv)
 
     repo_root = Path(args.repo).resolve() if args.repo else _find_repo_root(Path.cwd())
@@ -339,6 +400,28 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"[dashboard] repo root : {repo_root}", file=sys.stderr)
     print(f"[dashboard] output dir: {out_dir}", file=sys.stderr)
+
+    # Resolve scorecard baseline path.
+    if args.baseline:
+        scorecard_path = Path(args.baseline).resolve()
+    else:
+        scorecard_path = repo_root / BASELINE_PATH
+    print(f"[dashboard] scorecard : {scorecard_path}", file=sys.stderr)
+
+    # Load scorecard data (graceful — None if missing or wrong schema).
+    scorecard_run = load_scorecard_data(scorecard_path)
+    if scorecard_run is None:
+        print(
+            "[dashboard] No scorecard data found — scorecard section will show placeholder.",
+            file=sys.stderr,
+        )
+    else:
+        mode = scorecard_run.get("mode", "?")
+        n_iters = len(scorecard_run.get("iterations", []))
+        print(
+            f"[dashboard] Loaded scorecard: mode={mode}, {n_iters} iterations",
+            file=sys.stderr,
+        )
 
     history = build_history(repo_root, limit=args.limit)
     n_runs = len(history["runs"])
@@ -351,7 +434,7 @@ def main(argv: list[str] | None = None) -> int:
         _no_baseline_page(out_dir)
         return 0
 
-    render_output(history, out_dir)
+    render_output(history, out_dir, scorecard_run=scorecard_run)
     print(f"[dashboard] Wrote {n_runs} run(s) to {out_dir}", file=sys.stderr)
     return 0
 
