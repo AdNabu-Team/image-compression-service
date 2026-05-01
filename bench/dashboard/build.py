@@ -9,11 +9,16 @@ The dashboard also renders a per-format **scorecard** at the top of the page,
 reading the current baseline (or a file passed via ``--baseline``) to show
 compression, speed, quality, and accuracy at a glance.
 
+A ``quality-samples/index.html`` sub-page is generated when ``--with-samples``
+is set (the default).  It shows the worst-quality case per lossy format with
+base64-embedded before/after PNG thumbnails.
+
 CLI::
 
     python -m bench.dashboard.build [--out-dir dashboard/dist] [--limit 100]
     python -m bench.dashboard.build --repo /path/to/repo --out-dir /tmp/dash
     python -m bench.dashboard.build --baseline /tmp/pr_smoke.json --out-dir /tmp/dash
+    python -m bench.dashboard.build --baseline /tmp/pr.json --out-dir /tmp/dash --no-with-samples
 """
 
 from __future__ import annotations
@@ -28,6 +33,7 @@ from pathlib import Path
 from statistics import median
 from typing import Any
 
+from bench.dashboard.samples import build_sample_records
 from bench.dashboard.scorecard import build_kpis, build_scorecard, load_scorecard_data
 
 # ---------------------------------------------------------------------------
@@ -256,6 +262,9 @@ def render_output(
     history: dict[str, Any],
     out_dir: Path,
     scorecard_run: dict[str, Any] | None = None,
+    *,
+    with_samples: bool = True,
+    corpus_root: Path | None = None,
 ) -> None:
     """Write ``index.html`` and ``data/history.json`` to *out_dir*.
 
@@ -264,6 +273,11 @@ def render_output(
     If *scorecard_run* is provided (a parsed run JSON), scorecard data is
     embedded inline in the HTML as a JS variable for immediate first-paint
     rendering without an extra network fetch.
+
+    If *with_samples* is True (the default), also renders
+    ``quality-samples/index.html`` with per-format worst-case visual samples.
+    Pass *corpus_root* so thumbnails can be generated; if None, numeric-only
+    cards are rendered.
     """
     if out_dir.exists():
         shutil.rmtree(out_dir)
@@ -313,6 +327,256 @@ def render_output(
     # Write the trend data file.
     json_path = out_dir / "data" / "history.json"
     json_path.write_text(json.dumps(history, indent=2) + "\n", encoding="utf-8")
+
+    # Optionally render the quality-samples sub-page.
+    if with_samples:
+        try:
+            render_samples_page(out_dir, scorecard_run, corpus_root=corpus_root)
+        except Exception as exc:
+            import traceback
+
+            print(
+                f"[dashboard] WARNING: samples page generation failed: {exc}",
+                file=sys.stderr,
+            )
+            traceback.print_exc(file=sys.stderr)
+
+
+def _escape_html(s: str) -> str:
+    """Minimal HTML-escape for values embedded in the samples page."""
+    return (
+        s.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&#39;")
+    )
+
+
+def _status_icon(status: str) -> str:
+    if status == "fail":
+        return "❌"
+    if status == "warn":
+        return "⚠️"
+    return "✅"
+
+
+def _badge_class(status: str) -> str:
+    if status == "ok":
+        return "badge-ok"
+    if status == "warn":
+        return "badge-warn"
+    if status == "fail":
+        return "badge-fail"
+    return "badge-ok"
+
+
+def _render_sample_card(rec: dict[str, Any]) -> str:
+    """Render one HTML <article> for a format record."""
+    fmt = rec["format"].upper()
+    status = rec.get("status", "ok")
+    is_lossless = rec.get("lossless", False)
+    no_data = rec.get("no_data", False)
+
+    badge_cls = _badge_class(status)
+    icon = _status_icon(status)
+    card_cls = "sample-card"
+    if is_lossless:
+        card_cls += " lossless"
+    else:
+        card_cls += f" status-{status}"
+
+    lines: list[str] = []
+    lines.append(f'<article class="{card_cls}">')
+    lines.append('  <div class="card-header">')
+    lines.append(f"    <h2>{_escape_html(fmt)}</h2>")
+    lines.append(
+        f'    <span class="status-badge {badge_cls}">{icon} {_escape_html(status.upper())}</span>'
+    )
+    lines.append("  </div>")
+
+    if is_lossless:
+        lines.append(
+            '  <p class="lossless-note">Lossless — output is pixel-identical to input.</p>'
+        )
+    elif no_data:
+        lines.append(
+            '  <p class="no-data-note">No pr-mode quality data available for this format in the current run.</p>'
+        )
+    else:
+        ssim = rec.get("ssim")
+        psnr = rec.get("psnr_db")
+        case_id = rec.get("case_id") or ""
+        preset = rec.get("preset") or ""
+        size_orig = rec.get("size_orig_kb", 0)
+        size_opt = rec.get("size_opt_kb", 0)
+        reduction = rec.get("reduction_pct", 0.0)
+        threshold = rec.get("ssim_threshold")
+
+        # Metrics row
+        ssim_str = f"{ssim:.4f}" if ssim is not None else "—"
+        psnr_str = f"{psnr:.1f} dB" if psnr is not None else "—"
+        thresh_str = f"threshold {threshold:.2f}" if threshold is not None else ""
+        lines.append(
+            f'  <p class="card-meta">'
+            f"    <strong>SSIM</strong> {_escape_html(ssim_str)}"
+            f"    &nbsp;/&nbsp; <strong>PSNR</strong> {_escape_html(psnr_str)}"
+            + (f"    &nbsp;&middot;&nbsp; {_escape_html(thresh_str)}" if thresh_str else "")
+            + "  </p>"
+        )
+
+        # Case + compression row
+        if case_id:
+            lines.append(
+                f'  <p class="card-meta">Case: <code>{_escape_html(case_id)}</code>'
+                f" &nbsp;&middot;&nbsp; preset <strong>{_escape_html(preset)}</strong></p>"
+            )
+        if size_orig > 0 and size_opt > 0:
+            lines.append(
+                f'  <p class="card-meta">Compressed by <strong>{reduction:.0f}%</strong>'
+                f" ({size_orig:.1f} KB &rarr; {size_opt:.1f} KB)</p>"
+            )
+
+        # Thumbnails (if available)
+        orig_b64 = rec.get("orig_thumb_b64")
+        opt_b64 = rec.get("opt_thumb_b64")
+
+        if orig_b64 and opt_b64:
+            lines.append('  <div class="sample-pair">')
+            lines.append("    <figure>")
+            lines.append(
+                f'      <img src="data:image/png;base64,{orig_b64}"'
+                f' alt="Original {_escape_html(fmt)}" loading="lazy" />'
+            )
+            lines.append("      <figcaption>Original</figcaption>")
+            lines.append("    </figure>")
+            lines.append("    <figure>")
+            lines.append(
+                f'      <img src="data:image/png;base64,{opt_b64}"'
+                f' alt="Optimized {_escape_html(fmt)}" loading="lazy" />'
+            )
+            lines.append(
+                f"      <figcaption>Optimized (preset={_escape_html(preset)})</figcaption>"
+            )
+            lines.append("    </figure>")
+            lines.append("  </div>")
+        else:
+            lines.append('  <div class="sample-pair">')
+            lines.append("    <figure>")
+            lines.append(
+                '      <div class="no-thumb">Thumbnails not available — corpus not built</div>'
+            )
+            lines.append("    </figure>")
+            lines.append("    <figure>")
+            lines.append(
+                '      <div class="no-thumb">Run: python -m bench.corpus build --manifest core</div>'
+            )
+            lines.append("    </figure>")
+            lines.append("  </div>")
+
+    lines.append("</article>")
+    return "\n".join(lines)
+
+
+def render_samples_page(
+    out_dir: Path,
+    scorecard_run: dict[str, Any] | None,
+    corpus_root: Path | None = None,
+) -> None:
+    """Render ``quality-samples/index.html`` inside *out_dir*.
+
+    Parameters
+    ----------
+    out_dir:
+        The dashboard output directory (must already exist — main ``index.html``
+        must be written first).
+    scorecard_run:
+        Parsed bench run JSON.  May be None (quick-mode or missing) — in that
+        case a "no samples available" placeholder is written.
+    corpus_root:
+        Path to the corpus data directory for thumbnail generation.  If None,
+        numeric-only cards are rendered.
+    """
+    samples_dir = out_dir / "quality-samples"
+    samples_dir.mkdir(parents=True, exist_ok=True)
+
+    src_template = _template_dir() / "quality-samples.html"
+    template_html = src_template.read_text(encoding="utf-8")
+
+    if scorecard_run is None or scorecard_run.get("mode") not in ("pr",):
+        # Check heuristically for quality data even if mode isn't set to "pr"
+        has_quality = any(
+            isinstance(it.get("quality"), dict)
+            for it in (scorecard_run or {}).get("iterations", [])[:5]
+        )
+        if scorecard_run is None or (scorecard_run.get("mode") != "pr" and not has_quality):
+            body_html = (
+                '<div class="notice">'
+                "<p>No quality samples available yet.</p>"
+                "<p>Samples are generated from a pr-mode run. Run:</p>"
+                "<p><code>python -m bench.run --mode pr --manifest core "
+                "--out /tmp/pr.json</code></p>"
+                "<p>then rebuild the dashboard with "
+                "<code>--baseline /tmp/pr.json</code></p>"
+                "</div>"
+            )
+            meta_html = ""
+            html = template_html.replace("__BODY_HTML__", body_html).replace(
+                "__META_HTML__", meta_html
+            )
+            (samples_dir / "index.html").write_text(html, encoding="utf-8")
+            return
+
+    # Build per-format records.
+    try:
+        records = build_sample_records(scorecard_run, corpus_root=corpus_root)
+    except Exception as exc:
+        import traceback
+
+        print(f"[samples] ERROR building sample records: {exc}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        records = []
+
+    # Render cards.
+    if not records:
+        body_html = (
+            '<div class="notice">No sample records generated — '
+            "check that the baseline is a pr-mode run.</div>"
+        )
+    else:
+        # Section: lossy formats
+        lossy_recs = [r for r in records if not r.get("lossless")]
+        lossless_recs = [r for r in records if r.get("lossless")]
+
+        parts: list[str] = []
+        if lossy_recs:
+            parts.append('<p class="section-title">Lossy formats — worst-quality case</p>')
+            parts.append('<div class="cards">')
+            for rec in lossy_recs:
+                parts.append(_render_sample_card(rec))
+            parts.append("</div>")
+
+        if lossless_recs:
+            parts.append('<p class="section-title">Lossless formats</p>')
+            parts.append('<div class="cards">')
+            for rec in lossless_recs:
+                parts.append(_render_sample_card(rec))
+            parts.append("</div>")
+
+        body_html = "\n".join(parts)
+
+    # Meta line
+    ts = scorecard_run.get("timestamp", "") if scorecard_run else ""
+    ts_date = ts.split("T")[0] if ts else "unknown"
+    git_info = (scorecard_run or {}).get("git", {})
+    branch = git_info.get("branch", "?")
+    commit = (git_info.get("commit", "") or "")[:7] or "?"
+    meta_html = (
+        f"Run date: {_escape_html(ts_date)} &middot; {_escape_html(branch)}@{_escape_html(commit)}"
+    )
+
+    html = template_html.replace("__BODY_HTML__", body_html).replace("__META_HTML__", meta_html)
+    (samples_dir / "index.html").write_text(html, encoding="utf-8")
 
 
 def _no_baseline_page(out_dir: Path) -> None:
@@ -391,6 +655,31 @@ def main(argv: list[str] | None = None) -> int:
             "Defaults to reports/baseline.core.json relative to the repo root."
         ),
     )
+    parser.add_argument(
+        "--with-samples",
+        dest="with_samples",
+        action="store_true",
+        default=True,
+        help=(
+            "Generate the quality-samples/ sub-page (default: true). "
+            "Requires a pr-mode baseline for thumbnails."
+        ),
+    )
+    parser.add_argument(
+        "--no-with-samples",
+        dest="with_samples",
+        action="store_false",
+        help="Skip quality-samples/ sub-page generation (fast dev rebuilds).",
+    )
+    parser.add_argument(
+        "--corpus-root",
+        default=None,
+        help=(
+            "Path to the on-disk corpus directory for thumbnail generation. "
+            "Defaults to bench/corpus/data relative to the repo root. "
+            "Set to empty string to skip thumbnails."
+        ),
+    )
     args = parser.parse_args(argv)
 
     repo_root = Path(args.repo).resolve() if args.repo else _find_repo_root(Path.cwd())
@@ -407,6 +696,20 @@ def main(argv: list[str] | None = None) -> int:
     else:
         scorecard_path = repo_root / BASELINE_PATH
     print(f"[dashboard] scorecard : {scorecard_path}", file=sys.stderr)
+
+    # Resolve corpus root for sample thumbnails.
+    if args.corpus_root is not None:
+        corpus_root: Path | None = Path(args.corpus_root).resolve() if args.corpus_root else None
+    else:
+        default_corpus = repo_root / "bench" / "corpus" / "data"
+        corpus_root = default_corpus if default_corpus.exists() else None
+    if corpus_root is not None:
+        print(f"[dashboard] corpus    : {corpus_root}", file=sys.stderr)
+    else:
+        print(
+            "[dashboard] corpus    : not found — thumbnails will be skipped",
+            file=sys.stderr,
+        )
 
     # Load scorecard data (graceful — None if missing or wrong schema).
     scorecard_run = load_scorecard_data(scorecard_path)
@@ -434,8 +737,22 @@ def main(argv: list[str] | None = None) -> int:
         _no_baseline_page(out_dir)
         return 0
 
-    render_output(history, out_dir, scorecard_run=scorecard_run)
+    render_output(
+        history,
+        out_dir,
+        scorecard_run=scorecard_run,
+        with_samples=args.with_samples,
+        corpus_root=corpus_root,
+    )
     print(f"[dashboard] Wrote {n_runs} run(s) to {out_dir}", file=sys.stderr)
+    if args.with_samples:
+        samples_idx = out_dir / "quality-samples" / "index.html"
+        if samples_idx.exists():
+            size_kb = samples_idx.stat().st_size / 1024
+            print(
+                f"[dashboard] samples page: {samples_idx} ({size_kb:.0f} KB)",
+                file=sys.stderr,
+            )
     return 0
 
 
