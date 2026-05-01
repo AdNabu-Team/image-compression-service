@@ -13,6 +13,22 @@ from bench.runner.stats import CaseStats, percentile
 
 _SPARK_CHARS = "▁▂▃▄▅▆▇█"
 
+# Maps CaseDiff.label values to human-readable display strings for the
+# comparison table.  Keep non-regressions as "~" so the table stays scannable.
+_COMPARE_LABEL_DISPLAY: dict[str, str] = {
+    "significant": "❌ regression",
+    "noise_floor_regression": "⚠ noise-floor",
+    "improvement": "✅ improvement",
+    "below_threshold": "~",
+    "noise_floor_ok": "~",
+    "ok": "~",
+}
+
+
+def format_compare_label(label: str) -> str:
+    """Return the display string for a CaseDiff label column entry."""
+    return _COMPARE_LABEL_DISPLAY.get(label, label)
+
 
 def _sparkline(samples: list, max_buckets: int = 24) -> str:
     """Compress an RSS sample series into a unicode sparkline.

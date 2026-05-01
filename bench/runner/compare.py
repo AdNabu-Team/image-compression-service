@@ -6,6 +6,11 @@ and Cohen's d on the same — both must clear thresholds for a regression
 to be flagged. This combination defends against false alarms from
 either large-n inflated significance or single-outlier-driven means.
 
+When either side has fewer than 3 iterations (e.g. quick mode with 1
+iteration), Welch's t-test is meaningless (p is always 1.0, d is always
+0.0). In that case we fall back to a noise-floor check: flag as
+regression iff |delta%| >= noise_floor_pct (default 25%).
+
 Exit code semantics:
 
     0  no significant regression
@@ -20,12 +25,16 @@ from pathlib import Path
 from typing import Any
 
 from bench.runner.report.json_writer import load_run
+from bench.runner.report.markdown import format_compare_label
 from bench.runner.stats import (
     cohens_d,
     differs_significantly,
     median,
     welch_t_test,
 )
+
+# Minimum iterations on each side before we trust the stats-based gate.
+_STATS_MIN_ITERS = 3
 
 
 @dataclass
@@ -38,14 +47,19 @@ class CaseDiff:
     cohens_d: float
     significant: bool
     threshold_breach: bool
+    # True when the noise-floor path was used instead of the stats path.
+    iters_low_power: bool = False
 
     @property
     def label(self) -> str:
-        if not self.significant:
-            return "~"
-        if self.threshold_breach:
-            return "REGRESSION" if self.delta_pct > 0 else "IMPROVEMENT"
-        return "drift"
+        if self.iters_low_power:
+            # Noise-floor path: no stats, just |delta%| vs noise_floor_pct.
+            return "noise_floor_regression" if self.threshold_breach else "noise_floor_ok"
+        # Stats path: regression/improvement only when BOTH conditions hold.
+        if self.significant and self.threshold_breach:
+            return "significant" if self.delta_pct > 0 else "improvement"
+        # Delta exists but either not statistically significant or below threshold.
+        return "below_threshold" if self.threshold_breach else "ok"
 
 
 @dataclass
@@ -56,19 +70,36 @@ class CompareResult:
     only_in_a: list[str] = field(default_factory=list)
     only_in_b: list[str] = field(default_factory=list)
     threshold_pct: float = 10.0
+    noise_floor_pct: float = 25.0
     alpha: float = 0.05
 
     @property
     def regressions(self) -> list[CaseDiff]:
-        return [d for d in self.diffs if d.significant and d.threshold_breach and d.delta_pct > 0]
+        """Cases flagged by the stats gate (significant AND threshold_breach AND positive delta)."""
+        return [
+            d
+            for d in self.diffs
+            if not d.iters_low_power and d.significant and d.threshold_breach and d.delta_pct > 0
+        ]
+
+    @property
+    def noise_floor_flags(self) -> list[CaseDiff]:
+        """Cases flagged by the noise-floor gate (low-power path, |delta%| >= noise_floor_pct)."""
+        return [
+            d for d in self.diffs if d.iters_low_power and d.threshold_breach and d.delta_pct > 0
+        ]
 
     @property
     def improvements(self) -> list[CaseDiff]:
-        return [d for d in self.diffs if d.significant and d.threshold_breach and d.delta_pct < 0]
+        return [
+            d
+            for d in self.diffs
+            if not d.iters_low_power and d.significant and d.threshold_breach and d.delta_pct < 0
+        ]
 
     @property
     def exit_code(self) -> int:
-        return 1 if self.regressions else 0
+        return 1 if (self.regressions or self.noise_floor_flags) else 0
 
 
 def _wall_iterations_by_case(run: dict[str, Any]) -> dict[str, list[float]]:
@@ -85,10 +116,16 @@ def compare(
     b_path: Path,
     *,
     threshold_pct: float = 10.0,
+    noise_floor_pct: float = 25.0,
     alpha: float = 0.05,
     min_effect_size: float = 0.5,
 ) -> CompareResult:
-    """Welch's-t + Cohen's-d diff between two runs."""
+    """Welch's-t + Cohen's-d diff between two runs.
+
+    When either side has fewer than 3 iterations, falls back to a pure
+    |delta%| check at the higher noise_floor_pct threshold instead of the
+    stats-backed gate.
+    """
     a_run = load_run(a_path)
     b_run = load_run(b_path)
 
@@ -108,12 +145,23 @@ def compare(
         a_med = median(a_walls)
         b_med = median(b_walls)
         delta_pct = ((b_med - a_med) / a_med * 100.0) if a_med > 0 else 0.0
-        _, p, _ = welch_t_test(a_walls, b_walls)
-        d = cohens_d(a_walls, b_walls)
-        significant = differs_significantly(
-            a_walls, b_walls, alpha=alpha, min_effect_size=min_effect_size
-        )
-        threshold_breach = abs(delta_pct) >= threshold_pct
+
+        low_power = min(len(a_walls), len(b_walls)) < _STATS_MIN_ITERS
+
+        if low_power:
+            # Skip stats — they're meaningless with <3 iterations.
+            p = 1.0
+            d = 0.0
+            significant = False
+            threshold_breach = abs(delta_pct) >= noise_floor_pct
+        else:
+            _, p, _ = welch_t_test(a_walls, b_walls)
+            d = cohens_d(a_walls, b_walls)
+            significant = differs_significantly(
+                a_walls, b_walls, alpha=alpha, min_effect_size=min_effect_size
+            )
+            threshold_breach = abs(delta_pct) >= threshold_pct
+
         diffs.append(
             CaseDiff(
                 case_id=case_id,
@@ -124,6 +172,7 @@ def compare(
                 cohens_d=d,
                 significant=significant,
                 threshold_breach=threshold_breach,
+                iters_low_power=low_power,
             )
         )
 
@@ -134,6 +183,7 @@ def compare(
         only_in_a=only_in_a,
         only_in_b=only_in_b,
         threshold_pct=threshold_pct,
+        noise_floor_pct=noise_floor_pct,
         alpha=alpha,
     )
 
@@ -143,8 +193,10 @@ def render_compare_markdown(result: CompareResult) -> str:
     lines.append(f"# Bench compare: {result.a_path.name} → {result.b_path.name}")
     lines.append("")
     lines.append(
-        f"_threshold={result.threshold_pct}%, α={result.alpha}, "
-        f"cases compared={len(result.diffs)}, regressions={len(result.regressions)}, "
+        f"_threshold={result.threshold_pct}%, noise-floor={result.noise_floor_pct}%, "
+        f"α={result.alpha}, cases compared={len(result.diffs)}, "
+        f"regressions={len(result.regressions)}, "
+        f"noise_floor_flags={len(result.noise_floor_flags)}, "
         f"improvements={len(result.improvements)}_"
     )
     lines.append("")
@@ -164,9 +216,10 @@ def render_compare_markdown(result: CompareResult) -> str:
 
     sorted_diffs = sorted(result.diffs, key=lambda d: -abs(d.delta_pct))
     for d in sorted_diffs:
+        display_label = format_compare_label(d.label)
         lines.append(
             f"| `{d.case_id}` | {d.baseline_median_ms:.1f}ms | "
             f"{d.head_median_ms:.1f}ms | {d.delta_pct:+.1f}% | "
-            f"{d.p_value:.3f} | {d.cohens_d:+.2f} | **{d.label}** |"
+            f"{d.p_value:.3f} | {d.cohens_d:+.2f} | {display_label} |"
         )
     return "\n".join(lines)

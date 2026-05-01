@@ -176,6 +176,7 @@ def cmd_compare(args: argparse.Namespace) -> int:
             Path(args.baseline),
             Path(args.head),
             threshold_pct=args.threshold_pct,
+            noise_floor_pct=args.noise_floor_pct,
             alpha=args.alpha,
         )
     except (ValueError, KeyError) as e:
@@ -291,6 +292,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_cmp.add_argument("baseline")
     p_cmp.add_argument("head")
     p_cmp.add_argument("--threshold-pct", type=float, default=10.0)
+    p_cmp.add_argument(
+        "--noise-floor-pct",
+        type=float,
+        default=25.0,
+        help=(
+            "delta%% threshold used when either side has fewer than 3 iterations "
+            "(noise-floor path). Default: 25.0"
+        ),
+    )
     p_cmp.add_argument("--alpha", type=float, default=0.05)
     p_cmp.add_argument("--format", choices=("markdown", "json"), default="markdown")
     p_cmp.set_defaults(func=cmd_compare)

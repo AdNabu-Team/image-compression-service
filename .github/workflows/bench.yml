@@ -16,11 +16,15 @@ on:
       repeat:
         description: 'Number of repetitions (--repeat flag)'
         type: string
-        default: '1'
+        default: '3'
       warmup:
         description: 'Warmup iterations (--warmup flag)'
         type: string
-        default: '0'
+        default: '1'
+      noise_floor_pct:
+        description: 'Noise-floor threshold %% for low-iteration compare (--noise-floor-pct flag)'
+        type: string
+        default: '25'
 
 permissions:
   contents: read
@@ -105,7 +109,9 @@ jobs:
               pare:run-${{ github.run_id }} \
               bash -c "pip install --no-cache-dir -q -r requirements-bench.txt && \
                        python -m bench.compare \"$BASELINE\" reports/_head.json \
-                         --threshold-pct 10 --format markdown" \
+                         --threshold-pct 10 \
+                         --noise-floor-pct ${{ inputs.noise_floor_pct }} \
+                         --format markdown" \
               > /tmp/compare.md
             echo "compare-exit=$?" >> "$GITHUB_OUTPUT"
             set -e
