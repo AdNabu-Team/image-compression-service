@@ -98,11 +98,13 @@ class CompareResult:
 
     @property
     def improvements(self) -> list[CaseDiff]:
-        return [
-            d
-            for d in self.diffs
-            if not d.iters_low_power and d.significant and d.threshold_breach and d.delta_pct < 0
-        ]
+        out: list[CaseDiff] = []
+        for d in self.diffs:
+            if not d.threshold_breach or d.delta_pct >= 0:
+                continue
+            if d.iters_low_power or d.significant:
+                out.append(d)
+        return out
 
     @property
     def exit_code(self) -> int:
