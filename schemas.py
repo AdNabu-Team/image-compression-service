@@ -94,6 +94,7 @@ class EstimateResponse(BaseModel):
     method: str
     already_optimized: bool
     confidence: str
+    path: Optional[str] = None
 
 
 class ErrorResponse(BaseModel):

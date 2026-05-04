@@ -88,6 +88,7 @@ async def _run_one_accuracy_case(case: Case) -> dict[str, Any]:
         "method": est_result.method,
         "confidence": est_result.confidence,
         "already_optimized": est_result.already_optimized,
+        "path": est_result.path,
     }
 
     # --- Optimize phase ---
