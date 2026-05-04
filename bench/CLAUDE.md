@@ -10,17 +10,19 @@ The legacy `benchmarks/` measures `time.process_time()` (parent only) and `trace
 
 The corpus has two named manifests that can be benchmarked independently or together:
 
-**`core` — synthesized** (`bench/corpus/manifests/core.json`, manifest_version=1):
+**`core` — synthesized** (`bench/corpus/manifests/core.json`, manifest_version=1, **103 entries**):
 - Images generated deterministically from `(kind, seed, dims)` via `bench/corpus/synthesis/`.
 - No network required; reproducible anywhere from source code alone.
 - Pixel-level SHA-256 is pinned in the manifest (`expected_pixel_sha256`).
+- Covers all 12 formats across small/medium/large/xlarge buckets with ≥5 entries per content_kind; two format-limit exceptions noted in the manifest comments (AVIF graphic_geometric@large, WebP path_thin_gradient@large).
 
-**`full` — fetched + hash-pinned** (`bench/corpus/manifests/full.json`, manifest_version=2):
-- Real-world images downloaded from declared URLs (currently: Kodak Lossless True Color Image Suite, 8 of 24 images).
+**`full` — fetched + hash-pinned** (`bench/corpus/manifests/full.json`, manifest_version=2, **111 entries**):
+- Real-world images downloaded from declared URLs (Kodak Lossless True Color Image Suite + Wikimedia Commons non-photo content).
 - Each entry has a `source` field with `url`, `sha256`, `license`, and `attribution`.
 - Fetched bytes are cached under `bench/corpus/cache/<sha256[:2]>/<sha256>/<basename>` — not committed; add to `.gitignore`.
 - Pixel-level SHA-256 is still pinned per entry — the pixel hash catches CDN re-encodes.
 - Use `python -m bench.corpus fetch --manifest full` to pre-warm the cache before building.
+- Six non-photo `fetched_*` content_kinds cover categories where synthetic data is misleading: `fetched_text_screenshot`, `fetched_graphic_palette`, `fetched_graphic_geometric`, `fetched_transparent_overlay`, `fetched_animated_redraw`, `fetched_path_flat_text`. All sourced from Wikimedia Commons (CC-compatible / public domain). See `bench/corpus/synthesis/fetched.py` for the raise-on-call stub pattern.
 
 ### v1 → v2 schema change
 
@@ -32,9 +34,9 @@ A new `expected_byte_sha256` field (`dict[str, str] | None`) was added to `Manif
 
 ## Subpackages
 
-- **`bench.corpus`** — manifest-driven corpus builder. Synthesizers produce deterministic pixel data from seeds; fetchers download hash-pinned real-world images. Raster manifests pin pixel-level SHA-256 (decoded `Image.tobytes()`); vector manifests (SVG/SVGZ) pin byte-level SHA-256 of the source file. Encoded raster bytes drift across libjpeg-turbo SIMD paths and are never the canonical hash; vector encoded bytes are deterministic (mtime=0 gzip) and can be hashed but the source SHA is the contract.
+- **`bench.corpus`** — manifest-driven corpus builder. Synthesizers produce deterministic pixel data from seeds; fetchers download hash-pinned real-world images. Raster manifests pin pixel-level SHA-256 (decoded `Image.tobytes()`); vector manifests (SVG/SVGZ) pin byte-level SHA-256 of the source file. Encoded raster bytes drift across libjpeg-turbo SIMD paths and are never the canonical hash; vector encoded bytes are deterministic (mtime=0 gzip) and can be hashed but the source SHA is the contract. SVG synthesis (`bench/corpus/synthesis/svg.py`) has two content kinds: `vector_geometric` (rects/circles/lines on a coloured background, exercises scour path optimisation) and `vector_with_script` (same shapes plus a `<script>` block and `onclick` handler on the root element, exercises SvgOptimizer's sanitisation pipeline). SVG byte size scales with shape count, not with pixel dimensions — practical max bucket is ~medium without absurd shape counts.
 - **`bench.corpus.fetchers`** — HTTP fetcher (`bench/corpus/fetchers/http.py`). Downloads to a content-addressed local cache (`bench/corpus/cache/`); verifies SHA-256 before returning the path. Exceptions: `FetchError`, `FetchIntegrityError`, `FetchHTTPError`, `FetchTooLargeError`. Default cache root overridable via `--cache PATH`.
-- **`bench.runner`** — subprocess-aware benchmark runner. Modes: `quick` (1 iter, smoke), `timing` (5 iter + warmup, p50/p95/p99 + MAD, `--isolate`), `memory` (1 iter, peak RSS headline). `load` mode deferred to v1.
+- **`bench.runner`** — subprocess-aware benchmark runner. Modes: `quick` (1 iter, smoke), `timing` (5 iter + warmup, p50/p95/p99 + MAD, `--isolate`), `memory` (1 iter, peak RSS headline), `load` (concurrent request storm, gate testing), `accuracy` (estimate vs optimize size comparison). `load` mode per-case output includes `n_503_queue` (queue-depth cap hit) and `n_503_memory` (memory-budget cap hit) separately — `n_503` is their sum and is kept for backwards compatibility. Use `--tag fat_input` to restrict to the gate-exercising xlarge entries.
 
 ## Determinism contract
 
@@ -99,6 +101,30 @@ python -m bench.run --mode load --manifest core --tag fat_input \
 python -m bench.run --mode timing --exclude-tag fat_input
 python -m bench.run --mode quick  --exclude-tag fat_input
 ```
+
+## Estimator path attribution
+
+`EstimateResponse` includes an optional `path` field that identifies which code path produced the estimate. Three values are possible:
+
+| `path` | when used | error profile |
+|--------|-----------|---------------|
+| `exact` | images <150K pixels, SVG, animated | 0% by construction — full optimizer ran |
+| `direct_encode_sample` | JPEG, HEIC, AVIF, JXL, WebP, PNG | BPP extrapolation drift; source of most outliers |
+| `generic_fallback_sample` | GIF, BMP, TIFF | Sample compressed with actual optimizer; extrapolated |
+
+**Why this matters**: before `path` attribution, per-format error averages blended exact-mode rows (always 0%) with sample-mode rows (where real drift lives), masking the signal. The PNG +197% bug and AVIF -83% bug were only isolatable once exact rows were separated from `direct_encode_sample` rows.
+
+**Usage in accuracy analysis**:
+
+```bash
+# Run accuracy mode and pipe through analyzer
+python -m bench.run --mode accuracy --manifest full --out reports/accuracy.json
+python reports/full-bench/analyze_accuracy.py reports/accuracy.json
+# Look at "=== Estimator error by (format, path) ===" table
+# exact rows should show 0%; direct_encode_sample rows show real extrapolation error
+```
+
+The `path` field is recorded in `bench/runner/modes/accuracy.py` and passed through to the per-iteration JSON. The `analyze_accuracy.py` script in `reports/full-bench/` groups rows by `(format, path)` and prints median/p95/max error for each bucket. The `path` field is `Optional[str]` in `schemas.py` — existing API clients that ignore unknown fields are unaffected.
 
 ## Common commands
 
@@ -199,6 +225,33 @@ git commit -m "chore(bench): refresh baseline.core.json"
 ```
 
 Refresh the baseline whenever you intentionally change optimizer behavior, add corpus entries, or when you want to adopt the Docker-built numbers as the new reference (run the CI workflow on a clean branch, pull `reports/_head.json` from the artifact, rename it, and commit).
+
+## `bench compare` comparability guards
+
+`bench.compare` refuses to diff runs that cannot produce meaningful results:
+
+| check | behaviour | override |
+|-------|-----------|----------|
+| `metadata.mode` mismatch | **exits 2** with a clear error | `--allow-mismatched-mode` |
+| `metadata.config.isolate` mismatch | **warns** to stderr | `--allow-mismatched-isolate` |
+| `metadata.host.platform` mismatch | **warns** to stderr | `--allow-mismatched-platform` |
+
+Motivation: a TIFF false-regression investigation traced to a baseline run in Linux Docker quick mode being diffed against a macOS isolated timing mode head — every TIFF case appeared broken. Mode mismatch is a hard error (exit 2) because `wall_ms` is not comparable across modes. Isolate and platform mismatches are warnings because they affect timings quantitatively but the direction of drift is predictable.
+
+**Markdown output** always includes a `Compare conditions` header block showing mode/isolate/platform for both runs. **JSON output** includes `metadata.conditions.baseline` and `metadata.conditions.head` with the same fields.
+
+```bash
+# Normal compare — will exit 2 if modes differ
+python -m bench.compare reports/baseline.json reports/head.json --threshold-pct 10
+
+# Cross-mode rough trend (e.g. comparing quick vs timing as a sanity check only)
+python -m bench.compare reports/baseline.json reports/head.json \
+  --allow-mismatched-mode --allow-mismatched-platform
+
+# Suppress all warnings for cross-environment CI comparisons
+python -m bench.compare reports/baseline.json reports/head.json \
+  --allow-mismatched-isolate --allow-mismatched-platform
+```
 
 ## Dashboard
 
