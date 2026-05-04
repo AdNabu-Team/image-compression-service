@@ -9,12 +9,15 @@
                         [--memory-budget-mb N] [--annotate KEY=VAL ...]
 
     python -m bench.compare A.json B.json [--threshold-pct N] [--alpha A]
+                            [--allow-mismatched-mode] [--allow-mismatched-isolate]
+                            [--allow-mismatched-platform]
     python -m bench.run report RUN.json [--format markdown|json]
 
 Exit codes for `compare`:
     0  no significant regression
     1  regression flagged in at least one case
-    2  schema error (mismatched schema_version, missing required fields)
+    2  schema error (mismatched schema_version, missing required fields) or
+       comparability error (mode mismatch between runs)
 """
 
 from __future__ import annotations
@@ -23,10 +26,11 @@ import argparse
 import logging
 import sys
 from pathlib import Path
+from typing import Any
 
 from bench.corpus.cli import _load_manifest, _manifest_path
 from bench.runner.case import DEFAULT_PRESETS, load_cases
-from bench.runner.compare import compare, render_compare_markdown
+from bench.runner.compare import ModeMismatchError, compare, render_compare_markdown
 from bench.runner.modes.accuracy import run_accuracy_sync
 from bench.runner.modes.load import run_load_sync
 from bench.runner.modes.memory import run_memory_sync
@@ -217,6 +221,10 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 
 def cmd_compare(args: argparse.Namespace) -> int:
+    allow_mode = getattr(args, "allow_mismatched_mode", False)
+    allow_isolate = getattr(args, "allow_mismatched_isolate", False)
+    allow_platform = getattr(args, "allow_mismatched_platform", False)
+
     try:
         result = compare(
             Path(args.baseline),
@@ -224,13 +232,38 @@ def cmd_compare(args: argparse.Namespace) -> int:
             threshold_pct=args.threshold_pct,
             noise_floor_pct=args.noise_floor_pct,
             alpha=args.alpha,
+            allow_mismatched_mode=allow_mode,
         )
+    except ModeMismatchError as e:
+        # Hard error: modes are incompatible and user did not opt in.
+        print(f"compare: comparability error: {e}", file=sys.stderr)
+        return 2
     except (ValueError, KeyError) as e:
         # ValueError comes from load_run on schema_version mismatch;
         # KeyError catches missing required fields. Both map to
         # docstring exit code 2 ("schema error").
         print(f"compare: schema error: {e}", file=sys.stderr)
         return 2
+
+    # Emit soft warnings for isolate / platform mismatches (only when not opted in).
+    a = result.a_conditions
+    b = result.b_conditions
+    if a is not None and b is not None:
+        if a.isolate != b.isolate and not allow_isolate:
+            print(
+                f"WARNING: isolate mismatch — baseline isolate={a.isolate} but "
+                f"head isolate={b.isolate}. Isolated runs carry ~200-400ms/iter "
+                f"subprocess overhead. Pass --allow-mismatched-isolate to suppress.",
+                file=sys.stderr,
+            )
+        if a.platform != b.platform and not allow_platform:
+            print(
+                f"WARNING: platform mismatch — baseline platform={a.platform!r} but "
+                f"head platform={b.platform!r}. Pillow/zlib version drift across OSes "
+                f"may affect timings. Pass --allow-mismatched-platform to suppress.",
+                file=sys.stderr,
+            )
+
     if args.format == "markdown":
         print(render_compare_markdown(result))
     else:
@@ -238,9 +271,21 @@ def cmd_compare(args: argparse.Namespace) -> int:
         import json
         from dataclasses import asdict
 
+        conditions: dict[str, Any] = {}
+        if a is not None and b is not None:
+            conditions = {
+                "baseline": asdict(a),
+                "head": asdict(b),
+            }
+
         print(
             json.dumps(
                 {
+                    "metadata": {
+                        "baseline": str(Path(args.baseline).name),
+                        "head": str(Path(args.head).name),
+                        "conditions": conditions,
+                    },
                     "regressions": [asdict(d) for d in result.regressions],
                     "improvements": [asdict(d) for d in result.improvements],
                     "all": [asdict(d) for d in result.diffs],
@@ -359,6 +404,33 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_cmp.add_argument("--alpha", type=float, default=0.05)
     p_cmp.add_argument("--format", choices=("markdown", "json"), default="markdown")
+    p_cmp.add_argument(
+        "--allow-mismatched-mode",
+        action="store_true",
+        dest="allow_mismatched_mode",
+        help=(
+            "skip the mode-mismatch error and compute diffs anyway. "
+            "Use when you know the modes differ but want a rough trend comparison."
+        ),
+    )
+    p_cmp.add_argument(
+        "--allow-mismatched-isolate",
+        action="store_true",
+        dest="allow_mismatched_isolate",
+        help=(
+            "suppress the isolate-mismatch WARNING. "
+            "Isolate adds ~200-400ms/iter subprocess overhead."
+        ),
+    )
+    p_cmp.add_argument(
+        "--allow-mismatched-platform",
+        action="store_true",
+        dest="allow_mismatched_platform",
+        help=(
+            "suppress the platform-mismatch WARNING. "
+            "Pillow/zlib version drift across OSes may affect timings."
+        ),
+    )
     p_cmp.set_defaults(func=cmd_compare)
 
     p_rep = sub.add_parser("report", help="render a run as markdown or JSON")
