@@ -1199,6 +1199,470 @@
         "fat_input"
       ],
       "expected_pixel_sha256": "8db48d41981da5cfb225415d6dd1a094ca85c07a987079e3c2bb32d1631e543d"
+    },
+    {
+      "name": "text_screenshot_medium_png",
+      "bucket": "medium",
+      "content_kind": "text_screenshot",
+      "seed": 400,
+      "width": 1635,
+      "height": 1226,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "text"
+      ],
+      "expected_pixel_sha256": "873e0599dfee21361ac088f72957af10522593783b4ac0a2aece81b73e714756"
+    },
+    {
+      "name": "text_screenshot_large_png",
+      "bucket": "large",
+      "content_kind": "text_screenshot",
+      "seed": 401,
+      "width": 8000,
+      "height": 6000,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "text"
+      ],
+      "expected_pixel_sha256": "6d387ebbb1ca8f780ce4070101001c0f9de536e70cc454bb89e4f7b0285e0625"
+    },
+    {
+      "name": "text_screenshot_medium_jpeg",
+      "bucket": "medium",
+      "content_kind": "text_screenshot",
+      "seed": 402,
+      "width": 972,
+      "height": 729,
+      "output_formats": [
+        "jpeg"
+      ],
+      "tags": [
+        "text"
+      ],
+      "expected_pixel_sha256": "26a3211c1623084fbc99494972d2756f0d86a37bf7a3e2f74313e98e74e8bf8a"
+    },
+    {
+      "name": "text_screenshot_large_jpeg",
+      "bucket": "large",
+      "content_kind": "text_screenshot",
+      "seed": 403,
+      "width": 4000,
+      "height": 3000,
+      "output_formats": [
+        "jpeg"
+      ],
+      "tags": [
+        "text"
+      ],
+      "expected_pixel_sha256": "ada8a14e958e72620f99e834e808e464de410163a675c53f9bbe2857be1f8e88"
+    },
+    {
+      "name": "transparent_overlay_medium_png",
+      "bucket": "medium",
+      "content_kind": "transparent_overlay",
+      "seed": 404,
+      "width": 551,
+      "height": 413,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "transparent"
+      ],
+      "expected_pixel_sha256": "8e93f9c9ab4ee6a081aebd752f0e3ab86ed2200682566d84fb2bfd8ba40dcc59"
+    },
+    {
+      "name": "transparent_overlay_large_png",
+      "bucket": "large",
+      "content_kind": "transparent_overlay",
+      "seed": 405,
+      "width": 1475,
+      "height": 1106,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "transparent"
+      ],
+      "expected_pixel_sha256": "05a4d98cbe14143094d2b140b269b318fb1387dbb3f8e19b3e74f0dc37a1366e"
+    },
+    {
+      "name": "transparent_overlay_medium_webp",
+      "bucket": "medium",
+      "content_kind": "transparent_overlay",
+      "seed": 406,
+      "width": 841,
+      "height": 631,
+      "output_formats": [
+        "webp"
+      ],
+      "tags": [
+        "transparent"
+      ],
+      "expected_pixel_sha256": "41129bac2a58adc26bac424f656464acd4b31664f0869c38cb72d417478b83e3"
+    },
+    {
+      "name": "transparent_overlay_large_webp",
+      "bucket": "large",
+      "content_kind": "transparent_overlay",
+      "seed": 407,
+      "width": 2252,
+      "height": 1689,
+      "output_formats": [
+        "webp"
+      ],
+      "tags": [
+        "transparent"
+      ],
+      "expected_pixel_sha256": "c329d3f21c03b671f9ea0cb46c42520c26145a2e53fe2d1bec69b8ee90688453"
+    },
+    {
+      "name": "graphic_geometric_tiny_png",
+      "bucket": "tiny",
+      "content_kind": "graphic_geometric",
+      "seed": 408,
+      "width": 47,
+      "height": 35,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "graphic"
+      ],
+      "expected_pixel_sha256": "6360dbeabd8384b464145edad7e22a487bac68a1545f3e80218a6a9da383a2cf"
+    },
+    {
+      "name": "graphic_geometric_medium_png",
+      "bucket": "medium",
+      "content_kind": "graphic_geometric",
+      "seed": 409,
+      "width": 5000,
+      "height": 3750,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "graphic"
+      ],
+      "expected_pixel_sha256": "b3ce2d1b482e1d3d6620844251f21dfcd723e84f6e842dc70ad0bd4c4b20adba"
+    },
+    {
+      "name": "graphic_geometric_large_png",
+      "bucket": "large",
+      "content_kind": "graphic_geometric",
+      "seed": 410,
+      "width": 20000,
+      "height": 15000,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "graphic"
+      ],
+      "expected_pixel_sha256": "c7f37388ab5963a3c0733b5dd3c73ac45287e927f00f37aa13c3a36b666903ad"
+    },
+    {
+      "name": "graphic_geometric_tiny_jpeg",
+      "bucket": "tiny",
+      "content_kind": "graphic_geometric",
+      "seed": 411,
+      "width": 27,
+      "height": 20,
+      "output_formats": [
+        "jpeg"
+      ],
+      "tags": [
+        "graphic"
+      ],
+      "expected_pixel_sha256": "4beed0c6502016328e43fe1ba4992ca7ad4c99faf363c6c515065e993254336c"
+    },
+    {
+      "name": "graphic_geometric_medium_jpeg",
+      "bucket": "medium",
+      "content_kind": "graphic_geometric",
+      "seed": 412,
+      "width": 2000,
+      "height": 1500,
+      "output_formats": [
+        "jpeg"
+      ],
+      "tags": [
+        "graphic"
+      ],
+      "expected_pixel_sha256": "cd850e61af45ed9acfa484f04c3125a04644b98fce0eeb21f9012be9804e5446"
+    },
+    {
+      "name": "graphic_geometric_large_jpeg",
+      "bucket": "large",
+      "content_kind": "graphic_geometric",
+      "seed": 413,
+      "width": 9000,
+      "height": 6750,
+      "output_formats": [
+        "jpeg"
+      ],
+      "tags": [
+        "graphic"
+      ],
+      "expected_pixel_sha256": "7127c4ea98ea81957231bfba6e57c3a106d4b426025e95742e337c03b36baa1a"
+    },
+    {
+      "name": "graphic_geometric_tiny_avif",
+      "bucket": "tiny",
+      "content_kind": "graphic_geometric",
+      "seed": 414,
+      "width": 53,
+      "height": 40,
+      "output_formats": [
+        "avif"
+      ],
+      "tags": [
+        "graphic"
+      ],
+      "expected_pixel_sha256": "517eb4f2753248da54a035614a66411091492548df8d65b77649b02f1a4c53ab"
+    },
+    {
+      "name": "graphic_geometric_medium_avif",
+      "bucket": "medium",
+      "content_kind": "graphic_geometric",
+      "seed": 415,
+      "width": 10000,
+      "height": 7500,
+      "output_formats": [
+        "avif"
+      ],
+      "tags": [
+        "graphic"
+      ],
+      "expected_pixel_sha256": "a050902a58ce7894c1f09e3db6f3bbafedb2ca1f09f17054f217fd417d4a61cf"
+    },
+    {
+      "name": "path_text_on_flat_medium_jpeg",
+      "bucket": "medium",
+      "content_kind": "path_text_on_flat",
+      "seed": 416,
+      "width": 900,
+      "height": 675,
+      "output_formats": [
+        "jpeg"
+      ],
+      "tags": [
+        "pathological",
+        "chroma"
+      ],
+      "expected_pixel_sha256": "8e94a4796ee2a1a295fe920626e77a3fd4deb0c31dd3bde159582c63c5a36ac4"
+    },
+    {
+      "name": "path_text_on_flat_large_jpeg",
+      "bucket": "large",
+      "content_kind": "path_text_on_flat",
+      "seed": 417,
+      "width": 4500,
+      "height": 3375,
+      "output_formats": [
+        "jpeg"
+      ],
+      "tags": [
+        "pathological",
+        "chroma"
+      ],
+      "expected_pixel_sha256": "f6a38abb1c90bfe33392a6b6511db6d2f8274dbd75d05244449213242ba4b13d"
+    },
+    {
+      "name": "path_text_on_flat_medium_png",
+      "bucket": "medium",
+      "content_kind": "path_text_on_flat",
+      "seed": 418,
+      "width": 2433,
+      "height": 1825,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "pathological",
+        "chroma"
+      ],
+      "expected_pixel_sha256": "cd3ab0a2b932b7e23f776597dde531db703364b8e0b82c1920e9bef635e51fa3"
+    },
+    {
+      "name": "path_text_on_flat_large_png",
+      "bucket": "large",
+      "content_kind": "path_text_on_flat",
+      "seed": 419,
+      "width": 6509,
+      "height": 4882,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "pathological",
+        "chroma"
+      ],
+      "expected_pixel_sha256": "66692f51abbc4d6919b04a45712bbcd5effee032c203d772811264c6a4456a1a"
+    },
+    {
+      "name": "path_text_on_flat_medium_webp",
+      "bucket": "medium",
+      "content_kind": "path_text_on_flat",
+      "seed": 420,
+      "width": 1085,
+      "height": 814,
+      "output_formats": [
+        "webp"
+      ],
+      "tags": [
+        "pathological",
+        "chroma"
+      ],
+      "expected_pixel_sha256": "99b90c373f254a2a5bfba187842446d50f913eea2a0bf0ea7d75d49c20e18c80"
+    },
+    {
+      "name": "path_text_on_flat_large_webp",
+      "bucket": "large",
+      "content_kind": "path_text_on_flat",
+      "seed": 421,
+      "width": 9000,
+      "height": 6750,
+      "output_formats": [
+        "webp"
+      ],
+      "tags": [
+        "pathological",
+        "chroma"
+      ],
+      "expected_pixel_sha256": "a9b15cd29dca68ec4a5fcceff6ad5cd8fa0a454e6aef18b237df568b233e5cb0"
+    },
+    {
+      "name": "path_thin_gradient_medium_jpeg",
+      "bucket": "medium",
+      "content_kind": "path_thin_gradient",
+      "seed": 422,
+      "width": 3467,
+      "height": 2600,
+      "output_formats": [
+        "jpeg"
+      ],
+      "tags": [
+        "pathological",
+        "banding"
+      ],
+      "expected_pixel_sha256": "a564f164b1ac01f523aa41e273447704e25c17e635724d4eda469fdf213639f9"
+    },
+    {
+      "name": "path_thin_gradient_large_jpeg",
+      "bucket": "large",
+      "content_kind": "path_thin_gradient",
+      "seed": 423,
+      "width": 10000,
+      "height": 7500,
+      "output_formats": [
+        "jpeg"
+      ],
+      "tags": [
+        "pathological",
+        "banding"
+      ],
+      "expected_pixel_sha256": "f6b40e30557d5d5c5579ed81bf73355edaadbec6238962930b0796382bfba0b2"
+    },
+    {
+      "name": "path_thin_gradient_medium_png",
+      "bucket": "medium",
+      "content_kind": "path_thin_gradient",
+      "seed": 424,
+      "width": 10000,
+      "height": 7500,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "pathological",
+        "banding"
+      ],
+      "expected_pixel_sha256": "f6b40e30557d5d5c5579ed81bf73355edaadbec6238962930b0796382bfba0b2"
+    },
+    {
+      "name": "path_thin_gradient_large_png",
+      "bucket": "large",
+      "content_kind": "path_thin_gradient",
+      "seed": 425,
+      "width": 25000,
+      "height": 18750,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "pathological",
+        "banding"
+      ],
+      "expected_pixel_sha256": "c8eb36b5cab985d4df245211fcb6b0cd9b5cf9948d6f777113a4630d55750f5e"
+    },
+    {
+      "name": "path_thin_gradient_medium_webp",
+      "bucket": "medium",
+      "content_kind": "path_thin_gradient",
+      "seed": 426,
+      "width": 10833,
+      "height": 8125,
+      "output_formats": [
+        "webp"
+      ],
+      "tags": [
+        "pathological",
+        "banding"
+      ],
+      "expected_pixel_sha256": "27b32514f22128cdf11f92b193d36590e185fd16d44995714497702c6fecc9a9"
+    },
+    {
+      "name": "photo_noise_small_avif",
+      "bucket": "small",
+      "content_kind": "photo_noise",
+      "seed": 427,
+      "width": 247,
+      "height": 185,
+      "output_formats": [
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "worst_case"
+      ],
+      "expected_pixel_sha256": "8e25b8d8d65541a4e28530cf9a1144d7da9fe8f8f2702beab11f741b5d57aa1b"
+    },
+    {
+      "name": "photo_noise_small_webp",
+      "bucket": "small",
+      "content_kind": "photo_noise",
+      "seed": 428,
+      "width": 239,
+      "height": 179,
+      "output_formats": [
+        "webp"
+      ],
+      "tags": [
+        "photo",
+        "worst_case"
+      ],
+      "expected_pixel_sha256": "e66f48df0f36f3b7106c73a0ad94c2a9c1bc696afc602767461eee3734771637"
+    },
+    {
+      "name": "photo_noise_small_heic",
+      "bucket": "small",
+      "content_kind": "photo_noise",
+      "seed": 429,
+      "width": 177,
+      "height": 133,
+      "output_formats": [
+        "heic"
+      ],
+      "tags": [
+        "photo",
+        "worst_case"
+      ],
+      "expected_pixel_sha256": "801bbae8b329cdf0bcc4ea57bdcd8014cf368478c0badfda87ba4529f0cb167c"
     }
   ]
 }
