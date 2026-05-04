@@ -32,6 +32,8 @@ Per-case output schema (superset of quick mode):
         "queue_depth": 16,
         "n_success": 22,
         "n_503": 8,
+        "n_503_queue": 8,
+        "n_503_memory": 0,
         "n_error": 0,
         "wall_ms": 1240.5,
         "throughput_per_sec": 17.74,
@@ -124,9 +126,16 @@ async def _one_request(
     try:
         try:
             await gate.acquire(estimated_memory=estimated)
-        except BackpressureError:
+        except BackpressureError as exc:
+            # Distinguish queue-depth rejection from memory-budget rejection by
+            # message substring — BackpressureError is a single class; the gate
+            # only sets attribution in the message string (not a subclass).
+            # "Compression queue full." → queue-depth cap hit
+            # "Memory budget exceeded." → memory budget cap hit
+            msg = str(exc)
+            status_503 = "503_memory" if "Memory budget exceeded" in msg else "503_queue"
             return {
-                "status": "503",
+                "status": status_503,
                 "acquire_start_ns": acquire_start,
                 "acquire_grant_ns": None,
                 "release_ns": time.perf_counter_ns(),
@@ -150,10 +159,12 @@ async def _one_request(
         finally:
             gate.release(estimated_memory=estimated)
 
-    except BackpressureError:
+    except BackpressureError as exc:
         # Should not reach here (caught above), but guard defensively.
+        msg = str(exc)
+        status_503 = "503_memory" if "Memory budget exceeded" in msg else "503_queue"
         return {
-            "status": "503",
+            "status": status_503,
             "acquire_start_ns": acquire_start,
             "acquire_grant_ns": None,
             "release_ns": time.perf_counter_ns(),
@@ -231,7 +242,8 @@ async def _run_one_load_case(
 
     # --- Aggregate outcomes ---
     n_success = 0
-    n_503 = 0
+    n_503_queue = 0
+    n_503_memory = 0
     n_error = 0
 
     latency_ms_list: list[float] = []  # release - acquire_start (successes only)
@@ -266,8 +278,10 @@ async def _run_one_load_case(
                 all_invocations.append(
                     {"tool": inv.tool, "wall_ms": inv.wall_ms, "exit_code": inv.exit_code}
                 )
-        elif status == "503":
-            n_503 += 1
+        elif status == "503_queue":
+            n_503_queue += 1
+        elif status == "503_memory":
+            n_503_memory += 1
         else:
             n_error += 1
 
@@ -286,12 +300,16 @@ async def _run_one_load_case(
     throughput_per_sec = (n_success / (wall_ms / 1000.0)) if wall_ms > 0 else 0.0
     ok_rate = n_success / n_concurrent if n_concurrent > 0 else 0.0
 
+    n_503 = n_503_queue + n_503_memory
+
     load_block: dict[str, Any] = {
         "n_concurrent": n_concurrent,
         "semaphore_size": semaphore_size,
         "queue_depth": queue_depth,
         "n_success": n_success,
         "n_503": n_503,
+        "n_503_queue": n_503_queue,
+        "n_503_memory": n_503_memory,
         "n_error": n_error,
         "wall_ms": round(wall_ms, 1),
         "throughput_per_sec": round(throughput_per_sec, 2),

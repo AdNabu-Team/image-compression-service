@@ -80,6 +80,7 @@ def load_cases(
     fmt_filter: set[str] | None = None,
     bucket_filter: str | None = None,
     tag_filter: str | None = None,
+    exclude_tag: str | None = None,
     preset_filter: set[str] | None = None,
     skip_missing: bool = True,
 ) -> list[Case]:
@@ -87,6 +88,11 @@ def load_cases(
 
     Filters are applied additively. `preset_filter` defaults to all
     three presets.
+
+    `exclude_tag`: if set, entries that carry this tag are skipped. This
+    is additive (does not change behaviour when omitted). Primary use case:
+    ``exclude_tag="fat_input"`` to keep timing/quick/memory runs cheap while
+    still keeping fat-input entries in the manifest for explicit load testing.
 
     Missing-file handling depends on `skip_missing`:
       - `True` (default): log a warning and skip cases whose encoded
@@ -110,6 +116,8 @@ def load_cases(
     cases: list[Case] = []
     skipped: list[str] = []
     for entry in manifest.filter(bucket=bucket_filter, tag=tag_filter):
+        if exclude_tag and exclude_tag in entry.tags:
+            continue
         for fmt in entry.output_formats:
             if fmt_filter and fmt not in fmt_filter:
                 continue

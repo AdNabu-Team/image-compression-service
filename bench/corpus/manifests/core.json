@@ -1132,6 +1132,73 @@
         "photo"
       ],
       "expected_pixel_sha256": "6eae9cc0a1b91c0b23e779e922396b7f8feb9e98dc6ee7cfacb3f5776b1aabc9"
+    },
+    {
+      "name": "fat_tiff_perlin_xlarge",
+      "bucket": "xlarge",
+      "content_kind": "photo_perlin",
+      "seed": 300,
+      "width": 3200,
+      "height": 2400,
+      "output_formats": [
+        "tiff"
+      ],
+      "tags": [
+        "photo",
+        "fat_input"
+      ],
+      "expected_pixel_sha256": "bb6dc5441089c77b8b3da62020514efcb1f316625f5a620ca05559e80990e0ca"
+    },
+    {
+      "name": "fat_png_noise_xlarge",
+      "bucket": "xlarge",
+      "content_kind": "photo_noise",
+      "seed": 301,
+      "width": 3200,
+      "height": 2400,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "photo",
+        "worst_case",
+        "fat_input"
+      ],
+      "expected_pixel_sha256": "3f00d36bfc814d0c7334de15d7c67d29ac50c61b774c573f1001e3a029dd646d"
+    },
+    {
+      "name": "fat_bmp_noise_xlarge",
+      "bucket": "xlarge",
+      "content_kind": "photo_noise",
+      "seed": 302,
+      "width": 3200,
+      "height": 2400,
+      "output_formats": [
+        "bmp"
+      ],
+      "tags": [
+        "photo",
+        "worst_case",
+        "fat_input"
+      ],
+      "expected_pixel_sha256": "fe5b91a081cbd434a60625fd8a066d5c409b4cac14d794db609d45c38221f3cc"
+    },
+    {
+      "name": "fat_avif_noise_xlarge",
+      "bucket": "xlarge",
+      "content_kind": "photo_noise",
+      "seed": 303,
+      "width": 6800,
+      "height": 5100,
+      "output_formats": [
+        "avif"
+      ],
+      "tags": [
+        "photo",
+        "worst_case",
+        "fat_input"
+      ],
+      "expected_pixel_sha256": "8db48d41981da5cfb225415d6dd1a094ca85c07a987079e3c2bb32d1631e543d"
     }
   ]
 }

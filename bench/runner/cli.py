@@ -67,6 +67,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         fmt_filter=set(args.fmt) if args.fmt else None,
         bucket_filter=args.bucket,
         tag_filter=args.tag,
+        exclude_tag=args.exclude_tag,
         preset_filter=set(args.preset) if args.preset else None,
     )
     if not cases:
@@ -74,6 +75,34 @@ def cmd_run(args: argparse.Namespace) -> int:
         return 1
 
     print(f"running {args.mode} on {len(cases)} case(s)…", file=sys.stderr)
+
+    # Preflight: warn when JXL is disabled but the required tools are present.
+    # This saves the next dev from chasing "UnsupportedFormatError: Format jxl is not enabled"
+    # when cjxl and jxlpy are already installed.
+    from config import settings
+
+    if not settings.enable_jxl and (args.fmt is None or "jxl" in (args.fmt or [])):
+        _cjxl_present = False
+        _jxlpy_present = False
+        try:
+            import shutil
+
+            _cjxl_present = shutil.which("cjxl") is not None
+        except Exception:
+            pass
+        try:
+            import jxlpy  # noqa: F401
+
+            _jxlpy_present = True
+        except ImportError:
+            pass
+        if _cjxl_present and _jxlpy_present:
+            print(
+                "warning: enable_jxl=False but cjxl and jxlpy are both available. "
+                "JXL bench cases will fail with UnsupportedFormatError. "
+                "Set ENABLE_JXL=true (see .envrc.example) to enable JXL locally.",
+                file=sys.stderr,
+            )
 
     isolate = getattr(args, "isolate", False)
     quality_fast = getattr(args, "quality_fast", False)
@@ -253,6 +282,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_run.add_argument("--bucket", default=None)
     p_run.add_argument("--fmt", action="append", default=None)
     p_run.add_argument("--tag", default=None)
+    p_run.add_argument(
+        "--exclude-tag",
+        default=None,
+        dest="exclude_tag",
+        metavar="TAG",
+        help=(
+            "skip entries whose tag list includes TAG "
+            "(e.g. --exclude-tag fat_input keeps timing/quick/memory runs cheap)"
+        ),
+    )
     p_run.add_argument(
         "--preset",
         action="append",

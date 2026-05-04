@@ -60,6 +60,46 @@ A new `expected_byte_sha256` field (`dict[str, str] | None`) was added to `Manif
 
 **Deferred**: The production estimator's BPP curve fits in `estimation/estimator.py` assume 8-bit input; deep-color accuracy may be off until estimator updates land in a follow-up PR.
 
+## Fat-input corpus tier
+
+The `core` manifest contains a `fat_input` tag group: 4 entries (TIFF, PNG, BMP, AVIF) with
+encoded sizes in the 20–26 MB range — close to the 32 MB production upload limit.  These entries
+exist to exercise the `CompressionGate` memory-budget gate under realistic worst-case memory
+pressure; during a normal timing or memory run, the gate never engages because the rest of the
+corpus tops out at ~8 MB.
+
+**Sizes and memory estimates (encoded_bytes × MEMORY_MULTIPLIER):**
+
+| entry | format | size | multiplier | est. memory |
+|-------|--------|------|-----------|-------------|
+| `fat_tiff_perlin_xlarge` | tiff | 24.3 MB | 6 | ~146 MB |
+| `fat_png_noise_xlarge`   | png  | 22.0 MB | 5 | ~110 MB |
+| `fat_bmp_noise_xlarge`   | bmp  | 22.0 MB | 3 |  ~66 MB |
+| `fat_avif_noise_xlarge`  | avif | 23.5 MB | 4 |  ~94 MB |
+
+**Tag-exclusion design decision:** A `--exclude-tag TAG` flag was added to `bench.run` (see
+`bench/runner/case.py:load_cases` and `bench/runner/cli.py`).  This is **additive** — it has no
+effect on any existing invocation unless someone passes the flag.  The alternative of introducing a
+`huge` bucket and baking bucket exclusion into mode defaults was rejected because it would require
+changing the manifest schema *and* hard-coding mode knowledge into `load_cases`, which is harder to
+reverse.
+
+**Usage:**
+
+```bash
+# Build fat-input corpus files (takes ~10s for AVIF)
+python -m bench.corpus build --manifest core --tag fat_input
+
+# Run the load gate test (budget=256 MB forces memory rejections for TIFF)
+python -m bench.run --mode load --manifest core --tag fat_input \
+  --semaphore-size 10 --queue-depth 20 --n-concurrent 30 --memory-budget-mb 256 \
+  --out /tmp/load-fat-test.json
+
+# Exclude fat_input from normal timing/quick/memory runs to keep them cheap
+python -m bench.run --mode timing --exclude-tag fat_input
+python -m bench.run --mode quick  --exclude-tag fat_input
+```
+
 ## Common commands
 
 ```bash
@@ -95,6 +135,38 @@ python -m bench.run --mode memory --out reports/memory.json
 # Diff two runs with Welch's t-test
 python -m bench.compare reports/baseline.json reports/head.json --threshold-pct 10
 ```
+
+## Local environment
+
+### Enabling JXL locally
+
+`settings.enable_jxl` defaults to `False` because the JXL optimizer requires libjxl binaries
+(`cjxl`, `djxl`) and the `jxlpy` Python package, which are not present in every environment.
+Without the flag, every JXL bench case fails with `UnsupportedFormatError: Format jxl is not enabled`.
+
+If `cjxl`, `djxl`, and `jxlpy` are available in your venv, set `ENABLE_JXL=true` before running bench:
+
+```bash
+# Verify the toolchain is present
+which cjxl djxl
+.venv/bin/python -c "from jxlpy import JXLPyEncoder, JXLPyDecoder; print('ok')"
+
+# One-off run
+ENABLE_JXL=true python -m bench.run --mode quick --fmt jxl --manifest core --out /tmp/jxl.json
+
+# Persistent (direnv) — copy .envrc.example to .envrc and run `direnv allow`
+cp .envrc.example .envrc
+direnv allow
+```
+
+`bench.run` emits a warning automatically when `enable_jxl=False` but both `cjxl` and `jxlpy`
+are detected, so you won't silently get 21 failures without explanation.
+
+**Deep-color JXL cases (10/12-bit)**: Even with `ENABLE_JXL=true`, the 6 deep-color JXL bench
+cases (`deep_color_10bit_*` and `deep_color_12bit_*`) fail with
+`NotImplementedError: bits_per_sample not equals 8`. This is a known limitation — the
+`PillowReencodeOptimizer` base class opens images via `Image.open()` which decodes to 8-bit.
+The 15 standard 8-bit JXL cases all succeed. Deep-color support is a separate deferred item.
 
 ## CI integration
 
