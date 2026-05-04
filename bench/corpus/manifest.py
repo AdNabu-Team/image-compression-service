@@ -25,8 +25,9 @@ from PIL import Image, ImageSequence
 # A synthesizer returns one of:
 # - a single Pillow Image (static content);
 # - a list of Pillow Images (animated content, frame-by-frame);
-# - a numpy uint16 array (10/12-bit deep color, shape (H, W, 3 or 4)).
-Synthesized = Union[Image.Image, list[Image.Image], np.ndarray]
+# - a numpy uint16 array (10/12-bit deep color, shape (H, W, 3 or 4));
+# - bytes / bytearray (vector content — SVG/SVGZ synthesizers return raw XML bytes).
+Synthesized = Union[Image.Image, list[Image.Image], np.ndarray, bytes, bytearray]
 
 MANIFEST_VERSION = 2
 

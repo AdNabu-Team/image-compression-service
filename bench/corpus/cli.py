@@ -100,9 +100,14 @@ def cmd_verify(args: argparse.Namespace) -> int:
         from bench.corpus.manifest import is_vector_entry
 
         if is_vector_entry(entry):
-            from bench.corpus.builder import _load_vector_bytes
+            if entry.source is not None:
+                # Fetched vector (e.g. fetched_vector) — load from URL cache.
+                from bench.corpus.builder import _load_vector_bytes
 
-            return _load_vector_bytes(entry, cache_root)
+                return _load_vector_bytes(entry, cache_root)
+            # Synthesized vector (e.g. vector_geometric) — call the synthesizer
+            # which returns bytes directly.
+            return synthesize(entry)
         if entry.source is not None:
             from bench.corpus.builder import _load_fetched_content
 

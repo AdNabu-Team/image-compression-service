@@ -44,9 +44,19 @@ def kind(request: pytest.FixtureRequest) -> str:
     return request.param
 
 
+def _synth_hash(kind: str, **kwargs) -> str:
+    """Hash the synthesizer output regardless of type (pixel, ndarray, or bytes)."""
+    import hashlib
+
+    out = synthesize(_entry(kind, **kwargs))
+    if isinstance(out, (bytes, bytearray)):
+        return hashlib.sha256(out).hexdigest()
+    return pixel_sha256(out)
+
+
 def test_synth_returns_expected_type(kind: str):
     """Static kinds return Image, animated kinds return list[Image],
-    deep-color kinds return uint16 ndarray."""
+    deep-color kinds return uint16 ndarray, vector kinds return bytes."""
     out = synthesize(_entry(kind))
     if kind.startswith("animated_"):
         assert isinstance(out, list)
@@ -54,6 +64,8 @@ def test_synth_returns_expected_type(kind: str):
     elif kind.startswith("deep_color_"):
         assert isinstance(out, np.ndarray)
         assert out.dtype == np.uint16
+    elif kind.startswith("vector_"):
+        assert isinstance(out, (bytes, bytearray))
     else:
         assert isinstance(out, Image.Image)
 
@@ -64,22 +76,25 @@ def test_synth_respects_dimensions(kind: str):
         assert all(f.size == (80, 60) for f in out)
     elif kind.startswith("deep_color_"):
         assert out.shape[:2] == (60, 80)  # (H, W, ...) for ndarrays
+    elif kind.startswith("vector_"):
+        # SVG bytes embed dimensions as text; just check the content is non-empty
+        assert isinstance(out, (bytes, bytearray)) and len(out) > 0
     else:
         assert out.size == (80, 60)
 
 
 def test_synth_is_deterministic_across_three_runs(kind: str):
-    a = pixel_sha256(synthesize(_entry(kind, seed=42)))
-    b = pixel_sha256(synthesize(_entry(kind, seed=42)))
-    c = pixel_sha256(synthesize(_entry(kind, seed=42)))
-    assert a == b == c, f"{kind} produced different pixels across runs"
+    a = _synth_hash(kind, seed=42)
+    b = _synth_hash(kind, seed=42)
+    c = _synth_hash(kind, seed=42)
+    assert a == b == c, f"{kind} produced different output across runs"
 
 
 def test_synth_seed_actually_matters(kind: str):
     """Different seeds should yield different outputs — except for kinds
     whose output is seed-independent (e.g. solid fill, fixed patterns)."""
-    a = pixel_sha256(synthesize(_entry(kind, seed=1)))
-    b = pixel_sha256(synthesize(_entry(kind, seed=2)))
+    a = _synth_hash(kind, seed=1)
+    b = _synth_hash(kind, seed=2)
 
     seed_independent = {
         "path_thin_gradient",
@@ -137,6 +152,8 @@ def test_known_kinds_includes_all_categories():
         "deep_color_smooth",
         "deep_color_thin_gradient",
         "fetched_photo",
+        "vector_geometric",
+        "vector_with_script",
     }
     assert expected.issubset(kinds), f"missing: {expected - kinds}"
 

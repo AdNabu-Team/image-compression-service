@@ -163,20 +163,31 @@ def build(
             continue
 
         if is_vector_entry(entry):
-            # Vector path: fetch raw bytes; bypass Image.open()
-            if entry.source is None:
-                outcome.bucket_violations.append(
-                    f"{entry.name}: vector entry has no source URL — "
-                    f"fetched_vector entries must provide entry.source"
-                )
-                continue
-            try:
-                content: Synthesized = _load_vector_bytes(entry, cache_root)
-                outcome.source_hashes[entry.name] = entry.source.sha256
-                outcome.byte_hashes[entry.name] = hashlib.sha256(content).hexdigest()  # type: ignore[arg-type]
-            except Exception as e:
-                outcome.bucket_violations.append(f"{entry.name}: vector fetch failed: {e}")
-                continue
+            # Vector path: fetch raw bytes (fetched) or synthesize bytes (synthetic).
+            # In both cases the result must be bytes — no Image.open() involved.
+            if entry.source is not None:
+                # Fetched vector entry — download from declared URL.
+                try:
+                    content: Synthesized = _load_vector_bytes(entry, cache_root)
+                    outcome.source_hashes[entry.name] = entry.source.sha256
+                    outcome.byte_hashes[entry.name] = hashlib.sha256(content).hexdigest()  # type: ignore[arg-type]
+                except Exception as e:
+                    outcome.bucket_violations.append(f"{entry.name}: vector fetch failed: {e}")
+                    continue
+            else:
+                # Synthesized vector entry — call the registered synthesizer which
+                # returns bytes directly (no Pillow involved).
+                try:
+                    content = synthesize(entry)
+                    if not isinstance(content, (bytes, bytearray)):
+                        raise TypeError(
+                            f"vector synthesizer for {entry.content_kind!r} returned "
+                            f"{type(content).__name__!r}; expected bytes"
+                        )
+                    outcome.byte_hashes[entry.name] = hashlib.sha256(content).hexdigest()  # type: ignore[arg-type]
+                except Exception as e:
+                    outcome.bucket_violations.append(f"{entry.name}: vector synthesis failed: {e}")
+                    continue
             # No pixel_sha256 for vector entries
         elif entry.source is not None:
             # Fetched raster entry — download and decode from source URL
@@ -251,8 +262,17 @@ def reseal_manifest(
     )
     for entry in manifest.entries:
         if is_vector_entry(entry):
-            # Vector entry: store byte-level SHA of the source bytes
-            raw_bytes = _load_vector_bytes(entry, cache_root)
+            # Vector entry: store byte-level SHA of the source bytes.
+            # Supports both fetched (entry.source set) and synthesized (source None) entries.
+            if entry.source is not None:
+                raw_bytes = _load_vector_bytes(entry, cache_root)
+            else:
+                raw_bytes = synthesize(entry)  # type: ignore[assignment]
+                if not isinstance(raw_bytes, (bytes, bytearray)):
+                    raise TypeError(
+                        f"vector synthesizer for {entry.content_kind!r} returned "
+                        f"{type(raw_bytes).__name__!r}; expected bytes"
+                    )
             byte_sha = hashlib.sha256(raw_bytes).hexdigest()
             sealed_entry = ManifestEntry(
                 name=entry.name,

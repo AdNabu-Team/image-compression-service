@@ -872,6 +872,266 @@
       ],
       "expected_pixel_sha256": "8ca521a173045438d2d875c4cd5c49b51ca7ddce0747bc95af35ad6cef7aaaca",
       "bit_depth": 10
+    },
+    {
+      "name": "vector_geometric_tiny_svg",
+      "bucket": "tiny",
+      "content_kind": "vector_geometric",
+      "seed": 200,
+      "width": 64,
+      "height": 64,
+      "output_formats": [
+        "svg"
+      ],
+      "params": {
+        "n_shapes": 80
+      },
+      "tags": [
+        "vector",
+        "baseline"
+      ],
+      "expected_byte_sha256": {
+        "source": "04e6a985f5a65cc4405487e6eaf071dc7a73e89f180b1c648db1029191ee9a1c"
+      }
+    },
+    {
+      "name": "vector_geometric_small_svg",
+      "bucket": "small",
+      "content_kind": "vector_geometric",
+      "seed": 201,
+      "width": 256,
+      "height": 192,
+      "output_formats": [
+        "svg"
+      ],
+      "params": {
+        "n_shapes": 120
+      },
+      "tags": [
+        "vector",
+        "baseline"
+      ],
+      "expected_byte_sha256": {
+        "source": "591d4fd63c800ea8195d10a72f97b6bf430766cb1d10135395b6fedf0d9c0f39"
+      }
+    },
+    {
+      "name": "vector_geometric_medium_svg",
+      "bucket": "medium",
+      "content_kind": "vector_geometric",
+      "seed": 202,
+      "width": 768,
+      "height": 576,
+      "output_formats": [
+        "svg"
+      ],
+      "params": {
+        "n_shapes": 1200
+      },
+      "tags": [
+        "vector",
+        "baseline"
+      ],
+      "expected_byte_sha256": {
+        "source": "33be897b9f429189288cb92b1bc34f309bb2900f04ef5eff71135bf08196c1b1"
+      }
+    },
+    {
+      "name": "vector_geometric_large_canvas_svg",
+      "bucket": "medium",
+      "content_kind": "vector_geometric",
+      "seed": 203,
+      "width": 2048,
+      "height": 1536,
+      "output_formats": [
+        "svg"
+      ],
+      "params": {
+        "n_shapes": 1200
+      },
+      "tags": [
+        "vector",
+        "baseline"
+      ],
+      "expected_byte_sha256": {
+        "source": "a64d6a596a51eb6d65fa0d5338b8aed63f36769288804c48f08dc3a0935056e3"
+      }
+    },
+    {
+      "name": "vector_with_script_small_svg",
+      "bucket": "small",
+      "content_kind": "vector_with_script",
+      "seed": 204,
+      "width": 256,
+      "height": 192,
+      "output_formats": [
+        "svg"
+      ],
+      "params": {
+        "n_shapes": 120
+      },
+      "tags": [
+        "vector",
+        "sanitization_test"
+      ],
+      "expected_byte_sha256": {
+        "source": "64cb680075c6995fc903be88b4371b4b2b6c5241f8242c122a509a34403937cd"
+      }
+    },
+    {
+      "name": "vector_with_script_medium_svg",
+      "bucket": "medium",
+      "content_kind": "vector_with_script",
+      "seed": 205,
+      "width": 768,
+      "height": 576,
+      "output_formats": [
+        "svg"
+      ],
+      "params": {
+        "n_shapes": 1200
+      },
+      "tags": [
+        "vector",
+        "sanitization_test"
+      ],
+      "expected_byte_sha256": {
+        "source": "6f85c78e99797ce6ca439b061ffa1a4f002870ae0388162b750fcd99d5ce4560"
+      }
+    },
+    {
+      "name": "vector_geometric_tiny_svgz",
+      "bucket": "tiny",
+      "content_kind": "vector_geometric",
+      "seed": 201,
+      "width": 256,
+      "height": 192,
+      "output_formats": [
+        "svgz"
+      ],
+      "params": {
+        "n_shapes": 120
+      },
+      "tags": [
+        "vector",
+        "baseline"
+      ],
+      "expected_byte_sha256": {
+        "source": "591d4fd63c800ea8195d10a72f97b6bf430766cb1d10135395b6fedf0d9c0f39"
+      }
+    },
+    {
+      "name": "vector_with_script_small_svgz",
+      "bucket": "small",
+      "content_kind": "vector_with_script",
+      "seed": 205,
+      "width": 768,
+      "height": 576,
+      "output_formats": [
+        "svgz"
+      ],
+      "params": {
+        "n_shapes": 1200
+      },
+      "tags": [
+        "vector",
+        "sanitization_test"
+      ],
+      "expected_byte_sha256": {
+        "source": "6f85c78e99797ce6ca439b061ffa1a4f002870ae0388162b750fcd99d5ce4560"
+      }
+    },
+    {
+      "name": "animated_translation_tiny_apng",
+      "bucket": "tiny",
+      "content_kind": "animated_translation",
+      "seed": 110,
+      "width": 64,
+      "height": 48,
+      "output_formats": [
+        "apng"
+      ],
+      "tags": [
+        "animated"
+      ],
+      "expected_pixel_sha256": "0f6af6b3541dcea5daa1718258b4b2aca78a76e2817731ed281757e24c0a6335"
+    },
+    {
+      "name": "animated_translation_large_apng",
+      "bucket": "large",
+      "content_kind": "animated_translation",
+      "seed": 111,
+      "width": 1280,
+      "height": 960,
+      "output_formats": [
+        "apng"
+      ],
+      "tags": [
+        "animated"
+      ],
+      "expected_pixel_sha256": "3682064927843170b0aee407729420f305e30d2cd17d077bd795990ff3275e64"
+    },
+    {
+      "name": "animated_translation_xlarge_apng",
+      "bucket": "xlarge",
+      "content_kind": "animated_translation",
+      "seed": 112,
+      "width": 3000,
+      "height": 2000,
+      "output_formats": [
+        "apng"
+      ],
+      "tags": [
+        "animated"
+      ],
+      "expected_pixel_sha256": "6cace5abfe352ed20ff05e826f58c73a1ffbef1799ac1a3afc496512c70f0f37"
+    },
+    {
+      "name": "animated_redraw_tiny_gif",
+      "bucket": "tiny",
+      "content_kind": "animated_redraw",
+      "seed": 113,
+      "width": 40,
+      "height": 30,
+      "output_formats": [
+        "gif"
+      ],
+      "tags": [
+        "animated",
+        "worst_case"
+      ],
+      "expected_pixel_sha256": "ea5f9632e4cf1d2cd38210fe3c7c1445ef7e71e171bea8504e8c039c288a81ed"
+    },
+    {
+      "name": "animated_redraw_xlarge_gif",
+      "bucket": "xlarge",
+      "content_kind": "animated_redraw",
+      "seed": 114,
+      "width": 2560,
+      "height": 1920,
+      "output_formats": [
+        "gif"
+      ],
+      "tags": [
+        "animated",
+        "worst_case"
+      ],
+      "expected_pixel_sha256": "92d5332a9952c27a054387b39db012a436fbfbb6888111478b6af3cd8da32610"
+    },
+    {
+      "name": "photo_perlin_tiny_bmp",
+      "bucket": "tiny",
+      "content_kind": "photo_perlin",
+      "seed": 115,
+      "width": 56,
+      "height": 42,
+      "output_formats": [
+        "bmp"
+      ],
+      "tags": [
+        "photo"
+      ],
+      "expected_pixel_sha256": "6eae9cc0a1b91c0b23e779e922396b7f8feb9e98dc6ee7cfacb3f5776b1aabc9"
     }
   ]
 }

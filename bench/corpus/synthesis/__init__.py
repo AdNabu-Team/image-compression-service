@@ -24,6 +24,7 @@ from bench.corpus.synthesis import (  # noqa: F401, E402
     graphic,
     pathological,
     photo,
+    svg,
     text,
     transparent,
 )
