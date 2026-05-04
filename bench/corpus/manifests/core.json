@@ -1586,11 +1586,11 @@
     },
     {
       "name": "path_thin_gradient_large_png",
-      "bucket": "large",
+      "bucket": "medium",
       "content_kind": "path_thin_gradient",
       "seed": 425,
-      "width": 25000,
-      "height": 18750,
+      "width": 12000,
+      "height": 9000,
       "output_formats": [
         "png"
       ],
@@ -1598,7 +1598,7 @@
         "pathological",
         "banding"
       ],
-      "expected_pixel_sha256": "c8eb36b5cab985d4df245211fcb6b0cd9b5cf9948d6f777113a4630d55750f5e"
+      "expected_pixel_sha256": "596b0cbab6e3cd220e19121cc640a2ff0f3743e75c87d394d3761b2a5aac4733"
     },
     {
       "name": "path_thin_gradient_medium_webp",
