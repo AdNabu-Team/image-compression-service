@@ -32,9 +32,17 @@ def _entry(kind: str, *, seed: int = 1, w: int = 96, h: int = 96, **params) -> M
 
 # Stub kinds that intentionally raise rather than produce pixels — skip them
 # in the parametrised synthesizer tests (they have their own error-path tests).
-# fetched_photo: raster fetched entries (builder uses fetch + Image.open)
-# fetched_vector: vector fetched entries (builder uses fetch + byte pass-through)
-_STUB_KINDS = {"fetched_photo", "fetched_vector"}
+# fetched_*: raster/vector fetched entries (builder routes through fetch() pipeline)
+_STUB_KINDS = {
+    "fetched_photo",
+    "fetched_vector",
+    "fetched_text_screenshot",
+    "fetched_graphic_palette",
+    "fetched_graphic_geometric",
+    "fetched_transparent_overlay",
+    "fetched_animated_redraw",
+    "fetched_path_flat_text",
+}
 
 _SYNTHESIZABLE_KINDS = [k for k in known_kinds() if k not in _STUB_KINDS]
 
@@ -152,6 +160,13 @@ def test_known_kinds_includes_all_categories():
         "deep_color_smooth",
         "deep_color_thin_gradient",
         "fetched_photo",
+        "fetched_vector",
+        "fetched_text_screenshot",
+        "fetched_graphic_palette",
+        "fetched_graphic_geometric",
+        "fetched_transparent_overlay",
+        "fetched_animated_redraw",
+        "fetched_path_flat_text",
         "vector_geometric",
         "vector_with_script",
     }

@@ -2602,6 +2602,378 @@
       "expected_byte_sha256": {
         "source": "1f52a1d5f3c11d1452aac763e53ca9e74d6635298feb077059903595ca408206"
       }
+    },
+    {
+      "name": "realworld_text_screenshot_php_code",
+      "bucket": "small",
+      "content_kind": "fetched_text_screenshot",
+      "seed": 0,
+      "width": 1902,
+      "height": 1096,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "real_world",
+        "wikimedia",
+        "text_screenshot",
+        "code_editor",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "200b5aa36585909eef1947f57ba203ba95394abe5f280d433632b735c9594907",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/a/a6/%22Hello_World%22_Application_in_PHP.png",
+        "sha256": "b38ee2cf23d41afedad7a8881a4984c465880b0dbfb13417cae80c46dc208a98",
+        "license": "CC0 1.0 Universal (Public Domain Dedication)",
+        "attribution": "DirkDouse \u2014 PHP 7.4 'Hello World' application running on localhost, Wikimedia Commons (CC0 1.0, https://commons.wikimedia.org/wiki/File:%22Hello_World%22_Application_in_PHP.png)",
+        "notes": "Code editor / browser screenshot, 1902x1096, PHP dev server output, 53 KB"
+      }
+    },
+    {
+      "name": "realworld_text_screenshot_dashboard",
+      "bucket": "medium",
+      "content_kind": "fetched_text_screenshot",
+      "seed": 0,
+      "width": 1920,
+      "height": 1080,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "real_world",
+        "wikimedia",
+        "text_screenshot",
+        "dashboard",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "994c86fa36e67975af740c781000000a16b067868e64f145a2f37d567fe2d6e6",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/6/67/2_-_dashboard.png",
+        "sha256": "d5ee2f185c555b68d1570d453ae5e5d7d0857c29abb2a76983bbfb38f463db7d",
+        "license": "CC BY-SA 4.0",
+        "attribution": "Wikimedia Commons contributor \u2014 dashboard UI screenshot, 1920x1080 (CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:2_-_dashboard.png)",
+        "notes": "UI dashboard screenshot, 1920x1080 fullscreen, 145 KB"
+      }
+    },
+    {
+      "name": "realworld_text_screenshot_daw",
+      "bucket": "medium",
+      "content_kind": "fetched_text_screenshot",
+      "seed": 0,
+      "width": 1280,
+      "height": 800,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "real_world",
+        "wikimedia",
+        "text_screenshot",
+        "audio_editor",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "eb2b9bbef83bc1b797e5a45d08bbaf07052ad33e26ad66316cbe9222b2e6090d",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/0/00/64Studio-Ardour2.png",
+        "sha256": "2bb6cfa78ab1a7ca156bdee1d7d0aa1e58221e9f2e775982e38c08168d3aa0b7",
+        "license": "GPL v2.0 or later",
+        "attribution": "SoCalDonF \u2014 Ardour2 DAW session running in 64 Studio, Wikimedia Commons (GPL v2+, https://commons.wikimedia.org/wiki/File:64Studio-Ardour2.png)",
+        "notes": "Audio editor (DAW) screenshot, 1280x800, complex multi-panel UI, 142 KB"
+      }
+    },
+    {
+      "name": "realworld_graphic_palette_infographic_facts",
+      "bucket": "medium",
+      "content_kind": "fetched_graphic_palette",
+      "seed": 0,
+      "width": 795,
+      "height": 566,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "real_world",
+        "wikimedia",
+        "graphic_palette",
+        "infographic",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "1adb5c29ecee340c6804e940b4ac582c48f9130a7496441d7fa9d150f8d53c3d",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/1/13/Madonna_Facts_%26_Feats_%28Infographic%29.png",
+        "sha256": "5fa31c9829edc02e4f6d26526c95f3e0c902a40d9543983aad5e8e718335eeb7",
+        "license": "CC BY-SA 4.0",
+        "attribution": "Apoxyomenus \u2014 Madonna Facts & Feats infographic, Wikimedia Commons (CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Madonna_Facts_%26_Feats_(Infographic).png)",
+        "notes": "Illustrated infographic with flat-color palette, 795x566, 155 KB"
+      }
+    },
+    {
+      "name": "realworld_graphic_palette_chart_ecig",
+      "bucket": "small",
+      "content_kind": "fetched_graphic_palette",
+      "seed": 0,
+      "width": 699,
+      "height": 393,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "real_world",
+        "wikimedia",
+        "graphic_palette",
+        "chart",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "be901a69cb671ec7fdb50acd430e906c542e3bd663fe5230399cc45346ec8d7a",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/a/a0/Home-page-chart-infographic.png",
+        "sha256": "48f0a08af89b01c7a64659cb5d8eed377664023cd2037a65b969f68eaddc7314",
+        "license": "Public domain (U.S. federal government work)",
+        "attribution": "U.S. Surgeon General / Dept. of Health and Human Services \u2014 e-cigarette usage chart infographic, Wikimedia Commons (public domain, https://commons.wikimedia.org/wiki/File:Home-page-chart-infographic.png)",
+        "notes": "Simple bar/line chart infographic, 699x393, limited color palette, 60 KB"
+      }
+    },
+    {
+      "name": "realworld_graphic_geometric_flowchart_deploy",
+      "bucket": "medium",
+      "content_kind": "fetched_graphic_geometric",
+      "seed": 0,
+      "width": 1216,
+      "height": 1830,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "real_world",
+        "wikimedia",
+        "graphic_geometric",
+        "flowchart",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "50a61792cfe12280f9fa297de4af4a490efc2ab1e72bd7940ad1627283b79503",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/f/f2/Wikimedia_development_and_deployment_flowchart.png",
+        "sha256": "c5e99770df043930120c23faea5a9963306cd3f5d4738dd08a22058a4f4816ef",
+        "license": "CC0 1.0 Universal (Public Domain Dedication)",
+        "attribution": "Greg Grossmeier (WMF) \u2014 Wikimedia development and deployment flowchart, Wikimedia Commons (CC0 1.0, https://commons.wikimedia.org/wiki/File:Wikimedia_development_and_deployment_flowchart.png)",
+        "notes": "Software deployment flowchart with RGBA background, 1216x1830, 127 KB"
+      }
+    },
+    {
+      "name": "realworld_graphic_geometric_ecm_diagram",
+      "bucket": "medium",
+      "content_kind": "fetched_graphic_geometric",
+      "seed": 0,
+      "width": 1348,
+      "height": 743,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "real_world",
+        "wikimedia",
+        "graphic_geometric",
+        "architecture_diagram",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "d93c55a04bda127e070fce107e37ef64f526d3355288faa29a4d050506238be6",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/a/a6/AIIM_ECM_SLO_Scheme.png",
+        "sha256": "1ebe11bc2c3356a0cc9043b6ba442d861f950c2bb9296093133c9a08101eda80",
+        "license": "CC BY-SA 3.0",
+        "attribution": "ModriDirkac \u2014 AIIM Enterprise Content Management SLO scheme diagram, Wikimedia Commons (CC BY-SA 3.0, https://commons.wikimedia.org/wiki/File:AIIM_ECM_SLO_Scheme.png)",
+        "notes": "Software architecture diagram, 1348x743, boxes and arrows, 249 KB"
+      }
+    },
+    {
+      "name": "realworld_graphic_geometric_netcode_flowchart",
+      "bucket": "medium",
+      "content_kind": "fetched_graphic_geometric",
+      "seed": 0,
+      "width": 1477,
+      "height": 1861,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "real_world",
+        "wikimedia",
+        "graphic_geometric",
+        "flowchart",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "d9c547078e57bb05029ed11b5e201c33064eec3a35f6df4075fcd05d0595d50e",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/6/6e/Rollback_Netcode_Flowchart.png",
+        "sha256": "51c9f942c436a3d7cc9eda47d88b02383e063d7afcde9539033ef777c94c3289",
+        "license": "CC BY-SA 4.0",
+        "attribution": "GerardSN \u2014 Rollback Netcode execution and synchronization flowchart, Wikimedia Commons (CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Rollback_Netcode_Flowchart.png)",
+        "notes": "Detailed process flowchart with RGBA background, 1477x1861, 224 KB"
+      }
+    },
+    {
+      "name": "realworld_transparent_overlay_browser_icon",
+      "bucket": "small",
+      "content_kind": "fetched_transparent_overlay",
+      "seed": 0,
+      "width": 256,
+      "height": 256,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "real_world",
+        "wikimedia",
+        "transparent_overlay",
+        "icon",
+        "alpha",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "e02520eed74d76311d1de2ab1503b32ab8cefe1a802587b097ba8280f8fcc105",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/6/69/Crystal_Project_browser.png",
+        "sha256": "ba2e006525f89ec40b136b12c9baa5c06ed300a0c642399b37138aaef97b1afc",
+        "license": "LGPL v2.1 or later",
+        "attribution": "Everaldo Coelho (YellowIcon) \u2014 Crystal Project browser icon, 256x256 RGBA, Wikimedia Commons (LGPL v2.1+, https://commons.wikimedia.org/wiki/File:Crystal_Project_browser.png)",
+        "notes": "Application icon with RGBA transparency, 256x256, 72 KB"
+      }
+    },
+    {
+      "name": "realworld_transparent_overlay_user_icon",
+      "bucket": "small",
+      "content_kind": "fetched_transparent_overlay",
+      "seed": 0,
+      "width": 128,
+      "height": 128,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "real_world",
+        "wikimedia",
+        "transparent_overlay",
+        "icon",
+        "alpha",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "57b633ef582f57fc418383273846109e688bcdb255dd5e5853b13e323c765e64",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/b/b6/128px-Nuvola_apps_kuser_CAT.png",
+        "sha256": "d26c24fbc6430f7a5669ff752a2adec1587adf673945e736918986b13c188766",
+        "license": "LGPL v2.1 or later",
+        "attribution": "Al Lemos / David Vignoni (Nuvola) \u2014 Nuvola kuser Catalonia icon, 128x128 RGBA, Wikimedia Commons (LGPL v2.1+, https://commons.wikimedia.org/wiki/File:128px-Nuvola_apps_kuser_CAT.png)",
+        "notes": "Desktop application icon with RGBA transparency, 128x128, 21 KB"
+      }
+    },
+    {
+      "name": "realworld_animated_redraw_ipcc_climate",
+      "bucket": "medium",
+      "content_kind": "fetched_animated_redraw",
+      "seed": 0,
+      "width": 500,
+      "height": 376,
+      "output_formats": [
+        "gif"
+      ],
+      "tags": [
+        "real_world",
+        "wikimedia",
+        "animated",
+        "animated_redraw",
+        "chart",
+        "climate",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "c6cd3d6425c0394b381556db6e0b526be1dba7ac00e2785a6643e7a7a54c435b",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/4/4d/Ipcc-ar5draft-fig-1-4.gif",
+        "sha256": "856ae05838239e2fe4344b64e96455486cef26839cf1224c5dee852e576f8028",
+        "license": "CC BY-SA 3.0",
+        "attribution": "Ira Glickstein \u2014 IPCC AR5 draft Figure 1-4 animated climate chart, Wikimedia Commons (CC BY-SA 3.0, https://commons.wikimedia.org/wiki/File:Ipcc-ar5draft-fig-1-4.gif)",
+        "notes": "Animated climate temperature chart, 500x376, 7 frames, 668 KB, full-frame redraw"
+      }
+    },
+    {
+      "name": "realworld_animated_redraw_wdqs_barchart",
+      "bucket": "xlarge",
+      "content_kind": "fetched_animated_redraw",
+      "seed": 0,
+      "width": 930,
+      "height": 499,
+      "output_formats": [
+        "gif"
+      ],
+      "tags": [
+        "real_world",
+        "wikimedia",
+        "animated",
+        "animated_redraw",
+        "chart",
+        "wikidata",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "40e85872fb84ac48808dd33324890b0111d598b8c9450d767003a520730b88c1",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/9/9e/WDQS_-_Bar_Chart.gif",
+        "sha256": "9b4b5776e907680fa39bcd8316b939b35e64edb139d175168d002df677b9ede8",
+        "license": "CC BY-SA 4.0",
+        "attribution": "Jonas Kress (WMDE) \u2014 Wikidata Query Service animated bar chart, Wikimedia Commons (CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:WDQS_-_Bar_Chart.gif)",
+        "notes": "Animated bar chart from Wikidata Query Service, 930x499, 736 frames, 1.89 MB, full-frame redraw"
+      }
+    },
+    {
+      "name": "realworld_path_flat_text_savings_infographic",
+      "bucket": "medium",
+      "content_kind": "fetched_path_flat_text",
+      "seed": 0,
+      "width": 1668,
+      "height": 2224,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "real_world",
+        "wikimedia",
+        "path_flat_text",
+        "infographic",
+        "flat_color",
+        "tier:lite"
+      ],
+      "expected_pixel_sha256": "34bfb014d09c4f1c8f543987f4d700f5ee6f1284808250adb1b90ade682ef3db",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/e/e7/How_To_Save_Infographic.png",
+        "sha256": "e096d4f3db2d141e930c97e8a4f61dea47fd4b3a325b8b38a0165e801b878c06",
+        "license": "CC BY-SA 4.0",
+        "attribution": "Tmotegi1 \u2014 How To Save infographic poster, Wikimedia Commons (CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:How_To_Save_Infographic.png)",
+        "notes": "Tall poster infographic with flat colors and text, 1668x2224 RGBA, 791 KB"
+      }
+    },
+    {
+      "name": "realworld_path_flat_text_census_poster",
+      "bucket": "large",
+      "content_kind": "fetched_path_flat_text",
+      "seed": 0,
+      "width": 937,
+      "height": 1343,
+      "output_formats": [
+        "png"
+      ],
+      "tags": [
+        "real_world",
+        "wikimedia",
+        "path_flat_text",
+        "poster",
+        "flat_color",
+        "tier:full"
+      ],
+      "expected_pixel_sha256": "1e42660c3c5599b489431c8042c9eb5853a03cd50e6d8fcedaed2d8578bdb12b",
+      "source": {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/6/6e/1940_US_Census_Poster_%28border_removed%29.png",
+        "sha256": "e3b0c7ab153cd9fe2ff5e665b8ac15bac55ddbe67d515e373bcb07ed06d1f33b",
+        "license": "Public domain (U.S. Census Bureau employee work)",
+        "attribution": "U.S. Census Bureau \u2014 1940 US Census promotional poster (border removed), Wikimedia Commons (public domain, https://commons.wikimedia.org/wiki/File:1940_US_Census_Poster_(border_removed).png)",
+        "notes": "Illustrated flat-color government poster with text, 937x1343, 1.84 MB"
+      }
     }
   ]
 }
