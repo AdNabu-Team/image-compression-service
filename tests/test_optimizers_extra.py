@@ -102,7 +102,7 @@ async def test_avif_reencode_success(avif_optimizer):
     with patch.object(avif_optimizer, "_open_image", return_value=_mock_img()):
         with patch.object(avif_optimizer, "_reencode_from_img", return_value=b"small"):
             result = await avif_optimizer.optimize(
-                b"larger original avif", OptimizationConfig(strip_metadata=False)
+                b"larger original avif", OptimizationConfig(quality=60, strip_metadata=False)
             )
     assert result.method == "avif-reencode"
 
@@ -189,7 +189,7 @@ async def test_heic_reencode_success(heic_optimizer):
     with patch.object(heic_optimizer, "_open_image", return_value=_mock_img()):
         with patch.object(heic_optimizer, "_reencode_from_img", return_value=b"small"):
             result = await heic_optimizer.optimize(
-                b"larger original heic", OptimizationConfig(strip_metadata=False)
+                b"larger original heic", OptimizationConfig(quality=60, strip_metadata=False)
             )
     assert result.method == "heic-reencode"
 
