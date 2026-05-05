@@ -22,6 +22,11 @@ class PngOptimizer(BaseOptimizer):
     - quality < 50:  64 max colors, floor=1, speed=3, oxipng level=4 (aggressive)
     - quality < 70:  256 max colors, floor=1, speed=4, oxipng level=4 (moderate)
     - quality >= 70: lossless only, oxipng level=2 (gentle)
+
+    APNG path always uses oxipng level=2 regardless of quality preset. Level 4's
+    24 filter trials per frame add ~2s on xlarge animations with minimal gain:
+    frame chunks share dictionaries, so filter optimization yields less than for
+    static PNG where every byte is in a single IDAT stream.
     """
 
     format = ImageFormat.PNG
@@ -51,9 +56,12 @@ class PngOptimizer(BaseOptimizer):
 
         # APNG or lossless-only: skip pngquant
         if animated or not config.png_lossy:
-            optimized = await asyncio.to_thread(self._run_oxipng, data_clean, oxipng_level)
-            method = "oxipng"
-            return self._build_result(data, optimized, method)
+            # APNG: always use level 2 — level 4's 24 filter trials per frame
+            # add ~2s on xlarge animations with little gain (frames share
+            # dictionaries, so filter optimization matters less than for static PNG).
+            level = 2 if animated else oxipng_level
+            optimized = await asyncio.to_thread(self._run_oxipng, data_clean, level)
+            return self._build_result(data, optimized, "oxipng")
 
         # Quality-dependent pngquant settings
         if config.quality < 50:
