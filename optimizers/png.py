@@ -50,14 +50,33 @@ class PngOptimizer(BaseOptimizer):
     3. Otherwise → pngquant → oxipng on result
     4. pngquant exit code 99 (quality threshold not met) → fallback to oxipng on original
 
-    Quality controls aggressiveness:
-    - quality < 50:  64 max colors, floor=1, speed=3, oxipng level=4 (aggressive, capped at 2 for large PNGs)
-    - quality < 70:  256 max colors, floor=1, speed=4, oxipng level=4 (moderate, capped at 2 for large PNGs)
-    - quality >= 70: lossless only, oxipng level=2 (gentle)
+    Quality knobs (when png_lossy=True; lossless mode skips pngquant entirely):
+    - quality < 50:  pngquant 64 colors, speed=3 + oxipng level=4 (aggressive,
+                     capped at 2 when megapixels > 4M)
+    - quality < 70:  pngquant 256 colors, speed=4 + oxipng level=4 (moderate,
+                     capped at 2 when megapixels > 4M)
+    - quality >= 70: pngquant 256 colors, speed=4 + oxipng level=2 (gentle filters,
+                     the same lossless squeeze the lossless path uses)
 
-    APNG path: level 4 only when total pixel-frames (W × H × N_frames) fit
-    within the same 4 MP budget used for static PNG, AND quality < 70. Otherwise
-    level 2 — long animations cannot afford 24 filter trials per fdAT chunk.
+    Additionally: when pngquant alone shrinks input by ≥50%, the subsequent oxipng
+    pass is capped at level 2 even at quality < 70 — the marginal level-4 win on
+    top of an already-tight palette is small relative to its filter-trial cost.
+
+    Lossless path (animated PNG, or png_lossy=False) skips pngquant and runs
+    oxipng on the metadata-stripped original. APNG: level 4 only when total
+    pixel-frames (W × H × N_frames) fit within the same 4 MP budget used for
+    static PNG, AND quality < 70. Otherwise level 2 — long animations cannot
+    afford 24 filter trials per fdAT chunk (frame chunks share dictionaries, so
+    level 4's gain is disproportionately small there too).
+
+    Result selection: pngquant+oxipng is compared against the metadata-stripped
+    original; the smaller wins, with `_build_result()` enforcing output ≤ input as
+    a final safety net. We do *not* compute a separate oxipng-only-on-original
+    baseline to compare against — bench data (commit 377d723) showed it was
+    discarded in 56/60 cases, so the second oxipng pass is a measurable cost for a
+    rare marginal win. On inputs where pngquant inflates due to dithering
+    (`len(lossy_optimized) > len(data_clean)`), we fall through to the lossless
+    path explicitly.
 
     pyoxipng 9.x uses Rust rayon for parallel filter trials by default (all CPUs).
     There is no explicit threads parameter in the public API — parallelism is
