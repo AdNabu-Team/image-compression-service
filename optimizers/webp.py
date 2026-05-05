@@ -1,8 +1,5 @@
 import asyncio
 import io
-import os
-import shutil
-import tempfile
 
 from PIL import Image
 
@@ -10,17 +7,15 @@ from optimizers.base import BaseOptimizer
 from optimizers.utils import binary_search_quality
 from schemas import OptimizationConfig, OptimizeResult
 from utils.format_detect import ImageFormat
-from utils.subprocess_runner import run_tool
 
 
 class WebpOptimizer(BaseOptimizer):
-    """WebP optimization: Pillow + cwebp CLI run concurrently, pick smallest.
+    """WebP optimization: Pillow re-encode with method=4.
 
     Pipeline:
     1. Decode image once
-    2. Run Pillow re-encode and cwebp CLI in parallel
-    3. Pick the smallest result
-    4. If max_reduction set and exceeded, binary search quality (reuses decoded img)
+    2. Re-encode with Pillow at target quality
+    3. If max_reduction set and exceeded, binary search quality (reuses decoded img)
     """
 
     format = ImageFormat.WEBP
@@ -29,16 +24,8 @@ class WebpOptimizer(BaseOptimizer):
         # Decode once, share across all paths
         img, is_animated = await asyncio.to_thread(self._decode_image, data)
 
-        pillow_task = asyncio.to_thread(self._encode_webp, img, config.quality, is_animated)
-        cwebp_task = self._cwebp_fallback(data, config.quality)
-
-        pillow_result, cwebp_result = await asyncio.gather(pillow_task, cwebp_task)
-
-        best = pillow_result
+        best = await asyncio.to_thread(self._encode_webp, img, config.quality, is_animated)
         method = "pillow"
-        if cwebp_result and len(cwebp_result) < len(best):
-            best = cwebp_result
-            method = "cwebp"
 
         # Cap reduction if max_reduction is set (reuses pre-decoded img)
         if config.max_reduction is not None:
@@ -97,38 +84,3 @@ class WebpOptimizer(BaseOptimizer):
         img.save(output, **save_kwargs)
         return output.getvalue()
 
-    async def _cwebp_fallback(self, data: bytes, quality: int) -> bytes | None:
-        """Fallback to cwebp CLI.
-
-        cwebp doesn't support stdin/stdout piping, so temp files are required.
-        Returns None if cwebp is not available.
-        """
-        if not shutil.which("cwebp"):
-            return None
-
-        # cwebp requires file input/output
-        try:
-            with tempfile.NamedTemporaryFile(suffix=".webp", delete=False) as infile:
-                infile.write(data)
-                infile.flush()
-                in_path = infile.name
-
-            out_path = in_path + ".out.webp"
-
-            stdout, stderr, rc = await run_tool(
-                ["cwebp", "-q", str(quality), "-m", "4", "-mt", in_path, "-o", out_path],
-                b"",  # No stdin needed
-            )
-
-            if os.path.exists(out_path):
-                with open(out_path, "rb") as f:
-                    return f.read()
-            return None
-        except Exception:
-            return None
-        finally:
-            for path in (in_path, out_path):
-                try:
-                    os.unlink(path)
-                except OSError:
-                    pass
