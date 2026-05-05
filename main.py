@@ -41,9 +41,12 @@ async def lifespan(app: FastAPI):
     # Uvicorn's --timeout-graceful-shutdown handles connection draining.
     # This hook is for application-level cleanup.
     from security.rate_limiter import _redis
+    from utils.url_fetch import close_client
 
     if _redis:
         await _redis.close()
+
+    await close_client()
 
     logger.info("Pare shutting down")
 
