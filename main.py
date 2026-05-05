@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -33,6 +34,14 @@ async def lifespan(app: FastAPI):
         logger.warning(
             f"Missing tools: {missing}",
             extra={"context": {"missing_tools": missing}},
+        )
+
+    _cpu = os.cpu_count() or 0
+    if _cpu < 2:
+        logger.warning(
+            f"Detected cpu_count={_cpu}; CompressionGate floor of 2 applied. "
+            "Pin Cloud Run --cpu>=2 for production.",
+            extra={"context": {"cpu_count": _cpu}},
         )
 
     yield
