@@ -82,7 +82,7 @@ async def optimize(
     # Acquire compression slot (503 if queue or memory budget full)
     await compression_gate.acquire(estimated_memory=estimated_memory)
     try:
-        result = await optimize_image(data, opt_config)
+        result = await optimize_image(data, opt_config, fmt=fmt)
     finally:
         compression_gate.release(estimated_memory=estimated_memory)
 

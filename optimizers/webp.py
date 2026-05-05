@@ -83,4 +83,3 @@ class WebpOptimizer(BaseOptimizer):
 
         img.save(output, **save_kwargs)
         return output.getvalue()
-
