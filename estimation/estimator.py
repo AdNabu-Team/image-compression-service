@@ -48,6 +48,7 @@ if settings.enable_jxl:
             pass
 
 SAMPLE_MAX_WIDTH = 800  # BMP/TIFF need 800px+ to capture full-resolution redundancy
+_PNG_SAMPLE_TIMEOUT = 10  # seconds — pngquant subprocess timeout for sample encoding
 JPEG_SAMPLE_MAX_WIDTH = 1200  # JPEG needs larger samples for accurate BPP scaling
 LOSSY_SAMPLE_MAX_WIDTH = 800  # HEIC/AVIF/JXL also need larger samples
 EXACT_PIXEL_THRESHOLD = 150_000  # ~390x390 pixels
@@ -520,6 +521,7 @@ def _png_sample_bpp(
         png_data = buf.getvalue()
 
         # Use actual pngquant for accurate palette quantization
+        # Sync intentionally — this helper runs inside asyncio.to_thread (see _bpp_to_estimate)
         try:
             proc = subprocess.run(
                 [
@@ -535,7 +537,7 @@ def _png_sample_bpp(
                 ],
                 input=png_data,
                 capture_output=True,
-                timeout=10,
+                timeout=_PNG_SAMPLE_TIMEOUT,
             )
             if proc.returncode == 0 and proc.stdout:
                 png_data = proc.stdout
