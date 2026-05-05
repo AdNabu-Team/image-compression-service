@@ -1,4 +1,4 @@
-"""Tests for WebP optimizer — cwebp fallback paths and binary search cap."""
+"""Tests for WebP optimizer — binary search cap and max_reduction paths."""
 
 import io
 from unittest.mock import patch
@@ -20,49 +20,6 @@ def _make_webp(quality=95, size=(100, 100)):
     buf = io.BytesIO()
     img.save(buf, format="WEBP", quality=quality)
     return buf.getvalue()
-
-
-@pytest.mark.asyncio
-async def test_cwebp_fallback_file_created(webp_optimizer):
-    """cwebp fallback: writes temp file, reads result."""
-    data = _make_webp()
-
-    async def mock_run_tool(cmd, stdin_data):
-        # Simulate cwebp writing the output file
-        out_path = cmd[-1]  # Last arg is -o path
-        with open(out_path, "wb") as f:
-            f.write(b"small webp")
-        return b"", b"", 0
-
-    with patch("optimizers.webp.shutil.which", return_value="/usr/bin/cwebp"):
-        with patch("optimizers.webp.run_tool", side_effect=mock_run_tool):
-            result = await webp_optimizer._cwebp_fallback(data, 80)
-    assert result == b"small webp"
-
-
-@pytest.mark.asyncio
-async def test_cwebp_fallback_output_missing(webp_optimizer):
-    """cwebp runs but no output file -> returns None."""
-    data = _make_webp()
-
-    async def mock_run_tool(cmd, stdin_data):
-        return b"", b"error", 1
-
-    with patch("optimizers.webp.shutil.which", return_value="/usr/bin/cwebp"):
-        with patch("optimizers.webp.run_tool", side_effect=mock_run_tool):
-            result = await webp_optimizer._cwebp_fallback(data, 80)
-    assert result is None
-
-
-@pytest.mark.asyncio
-async def test_cwebp_fallback_exception(webp_optimizer):
-    """cwebp throws exception -> returns None."""
-    data = _make_webp()
-
-    with patch("optimizers.webp.shutil.which", return_value="/usr/bin/cwebp"):
-        with patch("optimizers.webp.run_tool", side_effect=Exception("failed")):
-            result = await webp_optimizer._cwebp_fallback(data, 80)
-    assert result is None
 
 
 def test_find_capped_quality_uses_predecoded_image(webp_optimizer):

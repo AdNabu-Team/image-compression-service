@@ -11,7 +11,6 @@ REQUIRED_TOOLS = {
     "pngquant": "pngquant",
     "jpegtran": "jpegtran",
     "gifsicle": "gifsicle",
-    "cwebp": "cwebp",
 }
 # cjpeg only required when using MozJPEG fallback
 if settings.jpeg_encoder == "cjpeg":

@@ -387,6 +387,18 @@
 
     /* Trend loading placeholder */
     #trends-placeholder { display: none; }
+
+    /* Quick-mode RSS caveat label */
+    .rss-note {
+      font-size: 0.70rem;
+      font-weight: 400;
+      color: var(--warn);
+      margin-left: 6px;
+      cursor: help;
+      border-bottom: 1px dashed var(--warn);
+      text-transform: none;
+      letter-spacing: 0;
+    }
   </style>
 </head>
 <body>
@@ -478,7 +490,7 @@
           <div class="chart-wrap"><canvas id="chart-p95"></canvas></div>
         </div>
         <div class="card">
-          <h2>peak RSS (KB, parent + children)</h2>
+          <h2>peak RSS (KB, parent + children) <span id="rss-mode-note" class="rss-note" style="display:none"></span></h2>
           <div class="chart-wrap"><canvas id="chart-rss"></canvas></div>
         </div>
       </div>
@@ -492,6 +504,7 @@
                 <th>SHA</th>
                 <th>Date</th>
                 <th>Subject</th>
+                <th>Mode</th>
                 <th>Cases</th>
                 <th>Errors</th>
               </tr>
@@ -765,19 +778,41 @@ function renderTable(runs) {
   if (!recent.length) {
     const tr = document.createElement("tr");
     const td = document.createElement("td");
-    td.colSpan = 5; td.className = "empty"; td.textContent = "No runs yet";
+    td.colSpan = 6; td.className = "empty"; td.textContent = "No runs yet";
     tr.appendChild(td); tbody.appendChild(tr);
     return;
   }
   for (const r of recent) {
     const tr = document.createElement("tr");
+    const modeLabel = r.mode || "quick";
     tr.innerHTML = `
       <td><span class="sha">${r.short_sha}</span></td>
       <td>${r.iso_date}</td>
       <td>${escHtml(r.subject)}</td>
+      <td>${escHtml(modeLabel)}</td>
       <td>${r.n_cases}</td>
       <td class="${r.n_errors > 0 ? "err" : ""}">${r.n_errors || 0}</td>`;
     tbody.appendChild(tr);
+  }
+}
+
+function updateRssNote(runs) {
+  const noteEl = document.getElementById("rss-mode-note");
+  if (!noteEl) return;
+  // Show a warning if any visible run is quick-mode (repeat=1 means RSS is
+  // process-wide at measurement time, not per-case isolated).
+  const hasQuick = runs.some((r) => !r.mode || r.mode === "quick");
+  if (hasQuick) {
+    noteEl.style.display = "inline";
+    noteEl.title =
+      "One or more runs here used --mode quick (repeat=1). " +
+      "In quick mode, peak_rss_kb is the process-wide RSS at the measurement " +
+      "window — not per-case isolated. Values are typically identical across " +
+      "cases in the same run and are not meaningful for per-case comparison. " +
+      "Use --mode memory for per-case isolated RSS measurements.";
+    noteEl.textContent = "⚠ quick-mode: process-wide RSS, not per-case";
+  } else {
+    noteEl.style.display = "none";
   }
 }
 
@@ -786,6 +821,7 @@ function redraw() {
   const fmts = filteredFmts(allFormats(HISTORY.runs || []), ACTIVE_FMT);
   updateCharts(runs, fmts);
   renderTable(runs);
+  updateRssNote(runs);
 }
 
 async function loadAndInitTrends() {

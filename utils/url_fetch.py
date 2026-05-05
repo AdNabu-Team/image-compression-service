@@ -1,8 +1,39 @@
+import asyncio
+
 import httpx
 
 from config import settings
 from exceptions import FileTooLargeError, URLFetchError
 from security.ssrf import validate_url
+
+# Module-level shared client — created once at first call, reused across requests.
+# Avoids per-request TLS handshake + connection setup overhead (~50-200ms on cold hosts).
+_client: httpx.AsyncClient | None = None
+_client_lock = asyncio.Lock()
+
+
+async def _get_client() -> httpx.AsyncClient:
+    """Return the shared AsyncClient, creating it on first call."""
+    global _client
+    if _client is None:
+        async with _client_lock:
+            if _client is None:
+                _client = httpx.AsyncClient(
+                    # Per-request timeout is passed to client.stream() instead,
+                    # so the client-level timeout is a wide backstop only.
+                    timeout=httpx.Timeout(settings.url_fetch_timeout * 4),
+                    follow_redirects=False,
+                    verify=True,
+                )
+    return _client
+
+
+async def close_client() -> None:
+    """Close the shared AsyncClient. Called from FastAPI lifespan shutdown."""
+    global _client
+    if _client is not None:
+        await _client.aclose()
+        _client = None
 
 
 async def fetch_image(url: str, is_authenticated: bool = False) -> bytes:
@@ -29,19 +60,16 @@ async def fetch_image(url: str, is_authenticated: bool = False) -> bytes:
 
     timeout = settings.url_fetch_timeout if is_authenticated else settings.url_fetch_timeout * 2
     max_redirects = settings.url_fetch_max_redirects
+    max_size = settings.max_file_size_bytes
+
+    client = await _get_client()
+    current_url = url
 
     try:
-        async with httpx.AsyncClient(
-            timeout=httpx.Timeout(timeout),
-            follow_redirects=False,
-            verify=True,
-        ) as client:
-            current_url = url
-
-            # 2. Manual redirect following with SSRF check at each hop
-            for _hop in range(max_redirects + 1):
-                response = await client.get(current_url)
-
+        for _hop in range(max_redirects + 1):
+            async with client.stream(
+                "GET", current_url, timeout=httpx.Timeout(timeout)
+            ) as response:
                 if response.is_redirect:
                     if response.next_request is None:
                         raise URLFetchError(
@@ -60,30 +88,34 @@ async def fetch_image(url: str, is_authenticated: bool = False) -> bytes:
                         http_status=response.status_code,
                     )
 
-                # 3. Check Content-Length header for early rejection
+                # 2. Check Content-Length header for early rejection
                 content_length = response.headers.get("content-length")
-                if content_length and int(content_length) > settings.max_file_size_bytes:
+                if content_length and int(content_length) > max_size:
                     raise FileTooLargeError(
                         f"URL content too large: {content_length} bytes",
                         file_size=int(content_length),
-                        limit=settings.max_file_size_bytes,
+                        limit=max_size,
                     )
 
-                # 4. Validate actual body size
-                data = response.content
-                if len(data) > settings.max_file_size_bytes:
-                    raise FileTooLargeError(
-                        f"URL content exceeds {settings.max_file_size_mb} MB limit",
-                        file_size=len(data),
-                        limit=settings.max_file_size_bytes,
-                    )
+                # 3. Stream body with running size check — abort on the first
+                # chunk that pushes past the limit, avoiding full download of
+                # oversized payloads before rejection.
+                buf = bytearray()
+                async for chunk in response.aiter_bytes():
+                    buf.extend(chunk)
+                    if len(buf) > max_size:
+                        raise FileTooLargeError(
+                            f"URL content exceeds {settings.max_file_size_mb} MB limit",
+                            file_size=len(buf),
+                            limit=max_size,
+                        )
 
-                return data
+                return bytes(buf)
 
-            raise URLFetchError(
-                f"Too many redirects (>{max_redirects})",
-                url=url,
-            )
+        raise URLFetchError(
+            f"Too many redirects (>{max_redirects})",
+            url=url,
+        )
 
     except httpx.TimeoutException:
         raise URLFetchError(
