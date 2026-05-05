@@ -314,7 +314,17 @@ async def _bpp_to_estimate(
     bit_depth: int | None,
 ) -> EstimateResponse:
     """Encode a sample with bpp_fn and extrapolate BPP to full image size."""
-    output_bpp, method = await asyncio.to_thread(bpp_fn, img, sample_width, sample_height, config)
+    # PNG sample BPP needs original dimensions to mirror the optimizer's dimension-aware
+    # oxipng level cap (the sample itself is small, but the level decision must reflect
+    # the original image's pixel count so estimation matches the real run).
+    if fmt in (ImageFormat.PNG, ImageFormat.APNG):
+        output_bpp, method = await asyncio.to_thread(
+            bpp_fn, img, sample_width, sample_height, config, width, height
+        )
+    else:
+        output_bpp, method = await asyncio.to_thread(
+            bpp_fn, img, sample_width, sample_height, config
+        )
 
     # TIFF lossless deflate/LZW: BPP scales sub-linearly with resolution because
     # larger images have more inter-pixel redundancy for the compressor to exploit.
@@ -496,6 +506,8 @@ def _png_sample_bpp(
     sample_width: int,
     sample_height: int,
     config: OptimizationConfig,
+    orig_width: int = 0,
+    orig_height: int = 0,
 ) -> tuple[float, str]:
     """Encode a PNG sample and return output BPP.
 
@@ -503,6 +515,11 @@ def _png_sample_bpp(
     on the sample (matching the optimizer pipeline), then oxipng.  Falls back
     to Pillow palette quantization if pngquant is not installed.
     For lossless mode: encodes with Pillow then runs oxipng.
+
+    orig_width/orig_height: original image dimensions (before downsampling).
+    Used to mirror the optimizer's dimension-aware oxipng level cap — the level
+    decision must reflect the original image's pixel count so estimation matches
+    what the real optimizer will produce, not the sample's much-smaller area.
     """
     import oxipng
 
@@ -561,8 +578,13 @@ def _png_sample_bpp(
         png_data = buf.getvalue()
         method = "oxipng"
 
-    # oxipng matches what the actual optimizer uses
-    oxipng_level = 4 if config.quality < 70 else 2
+    # Mirror optimizer's dimension-aware level cap (operates on the original image,
+    # not the sample, so estimation matches the actual run).
+    # LARGE_MP_THRESHOLD must match the constant in optimizers/png.py.
+    _LARGE_MP_THRESHOLD = 4_000_000
+    oxipng_level = (
+        2 if (orig_width * orig_height > _LARGE_MP_THRESHOLD or config.quality >= 70) else 4
+    )
     optimized = oxipng.optimize_from_memory(png_data, level=oxipng_level)
     output_size = len(optimized)
     sample_pixels = sample_width * sample_height
