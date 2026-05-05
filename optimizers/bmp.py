@@ -2,6 +2,7 @@ import asyncio
 import io
 import struct
 
+import numpy as np
 from PIL import Image
 
 from optimizers.base import BaseOptimizer
@@ -89,39 +90,62 @@ class BmpOptimizer(BaseOptimizer):
         (no quantization, no color loss) and returns (palette_img, bmp_bytes, method).
         Returns None if the image has too many colors.
 
-        Uses single-pass early termination: bails out as soon as color 257 is
-        found, and builds the color-to-index map simultaneously.
+        Uses numpy unique() for a single C-level pass over all pixels, which is
+        dramatically faster than Python-level dict iteration for large images.
         """
-        unique = {}
-        pixel_indices = bytearray()
+        arr = np.asarray(img)  # H x W x 3 (RGB) or H x W (L)
 
-        for pixel in img.getdata():
-            idx = unique.get(pixel)
-            if idx is None:
-                idx = len(unique)
-                if idx >= 256:
-                    return None  # Early exit — no wasted allocation
-                unique[pixel] = idx
-            pixel_indices.append(idx)
+        if arr.ndim == 3:
+            # Pack RGB channels into a single uint32 for fast unique comparison.
+            # Each pixel becomes (R << 16 | G << 8 | B) — unique per distinct color.
+            packed = (
+                arr[..., 0].astype(np.uint32) << 16
+                | arr[..., 1].astype(np.uint32) << 8
+                | arr[..., 2].astype(np.uint32)
+            )
+            is_rgb = True
+        else:
+            packed = arr.astype(np.uint32)
+            is_rgb = False
+
+        flat = packed.ravel()
+
+        # Early-exit sample: if a small slice already has >256 unique values,
+        # the full image won't fit in an 8-bit palette. This avoids a full-image
+        # np.unique pass for photographic input that will be discarded anyway.
+        SAMPLE_SIZE = 4096
+        if flat.size > SAMPLE_SIZE:
+            sample = flat[:SAMPLE_SIZE]
+            if np.unique(sample).size > 256:
+                return None
+
+        unique_vals, inverse = np.unique(flat, return_inverse=True)
+
+        if len(unique_vals) > 256:
+            return None  # Too many colors for an 8-bit palette
 
         w, h = img.size
 
+        # inverse gives the per-pixel index into unique_vals (in sorted order).
+        pixel_indices = inverse.astype(np.uint8).tobytes()
+
         # Build palette image with exact color mapping
         palette_img = Image.new("P", (w, h))
-        palette_img.putdata(list(pixel_indices))
+        palette_img.frombytes(pixel_indices)
 
         # Build RGB palette (Pillow expects flat R,G,B list of 768 entries)
         flat_palette = [0] * 768
-        for color, i in unique.items():
-            if isinstance(color, int):
-                # Grayscale
-                flat_palette[i * 3] = color
-                flat_palette[i * 3 + 1] = color
-                flat_palette[i * 3 + 2] = color
+        for i, packed_val in enumerate(unique_vals):
+            v = int(packed_val)
+            if is_rgb:
+                flat_palette[i * 3] = (v >> 16) & 0xFF  # R
+                flat_palette[i * 3 + 1] = (v >> 8) & 0xFF  # G
+                flat_palette[i * 3 + 2] = v & 0xFF  # B
             else:
-                flat_palette[i * 3] = color[0]
-                flat_palette[i * 3 + 1] = color[1]
-                flat_palette[i * 3 + 2] = color[2]
+                # Grayscale: replicate the single channel to R, G, B
+                flat_palette[i * 3] = v
+                flat_palette[i * 3 + 1] = v
+                flat_palette[i * 3 + 2] = v
         palette_img.putpalette(flat_palette)
 
         buf = io.BytesIO()
@@ -148,12 +172,12 @@ class BmpOptimizer(BaseOptimizer):
             return None
 
         w, h = palette_img.size
-        pixels = palette_img.load()
+        arr = np.asarray(palette_img)  # H x W, dtype uint8 — no copy
 
         # --- Encode RLE8 data (BMP stores rows bottom-to-top) ---
         rle_data = bytearray()
         for y in range(h - 1, -1, -1):
-            row = bytes(pixels[x, y] for x in range(w))
+            row = arr[y].tobytes()  # Contiguous C-level row extraction
             _rle8_encode_row(row, rle_data)
             rle_data.extend(b"\x00\x00")  # end-of-line
 
