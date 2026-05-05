@@ -56,7 +56,8 @@ class Settings(BaseSettings):
         if self.max_file_size_bytes == 0:
             self.max_file_size_bytes = self.max_file_size_mb * 1024 * 1024
         if self.compression_semaphore_size == 0:
-            self.compression_semaphore_size = os.cpu_count() or 4
+            cpu = os.cpu_count() or 4
+            self.compression_semaphore_size = max(2, cpu)
         if self.max_queue_depth == 0:
             self.max_queue_depth = 2 * self.compression_semaphore_size
         if self.estimate_semaphore_size == 0:

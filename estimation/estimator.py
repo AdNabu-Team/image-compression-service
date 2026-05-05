@@ -17,6 +17,7 @@ import subprocess
 from PIL import Image
 
 from config import settings
+from optimizers.png import LARGE_MP_THRESHOLD
 from optimizers.router import optimize_image
 from optimizers.utils import clamp_quality
 from schemas import EstimateResponse, OptimizationConfig
@@ -48,6 +49,7 @@ if settings.enable_jxl:
             pass
 
 SAMPLE_MAX_WIDTH = 800  # BMP/TIFF need 800px+ to capture full-resolution redundancy
+_PNG_SAMPLE_TIMEOUT = 10  # seconds — pngquant subprocess timeout for sample encoding
 JPEG_SAMPLE_MAX_WIDTH = 1200  # JPEG needs larger samples for accurate BPP scaling
 LOSSY_SAMPLE_MAX_WIDTH = 800  # HEIC/AVIF/JXL also need larger samples
 EXACT_PIXEL_THRESHOLD = 150_000  # ~390x390 pixels
@@ -313,7 +315,17 @@ async def _bpp_to_estimate(
     bit_depth: int | None,
 ) -> EstimateResponse:
     """Encode a sample with bpp_fn and extrapolate BPP to full image size."""
-    output_bpp, method = await asyncio.to_thread(bpp_fn, img, sample_width, sample_height, config)
+    # PNG sample BPP needs original dimensions to mirror the optimizer's dimension-aware
+    # oxipng level cap (the sample itself is small, but the level decision must reflect
+    # the original image's pixel count so estimation matches the real run).
+    if fmt in (ImageFormat.PNG, ImageFormat.APNG):
+        output_bpp, method = await asyncio.to_thread(
+            bpp_fn, img, sample_width, sample_height, config, width, height
+        )
+    else:
+        output_bpp, method = await asyncio.to_thread(
+            bpp_fn, img, sample_width, sample_height, config
+        )
 
     # TIFF lossless deflate/LZW: BPP scales sub-linearly with resolution because
     # larger images have more inter-pixel redundancy for the compressor to exploit.
@@ -495,6 +507,8 @@ def _png_sample_bpp(
     sample_width: int,
     sample_height: int,
     config: OptimizationConfig,
+    orig_width: int = 0,
+    orig_height: int = 0,
 ) -> tuple[float, str]:
     """Encode a PNG sample and return output BPP.
 
@@ -502,6 +516,11 @@ def _png_sample_bpp(
     on the sample (matching the optimizer pipeline), then oxipng.  Falls back
     to Pillow palette quantization if pngquant is not installed.
     For lossless mode: encodes with Pillow then runs oxipng.
+
+    orig_width/orig_height: original image dimensions (before downsampling).
+    Used to mirror the optimizer's dimension-aware oxipng level cap — the level
+    decision must reflect the original image's pixel count so estimation matches
+    what the real optimizer will produce, not the sample's much-smaller area.
     """
     import oxipng
 
@@ -520,6 +539,7 @@ def _png_sample_bpp(
         png_data = buf.getvalue()
 
         # Use actual pngquant for accurate palette quantization
+        # Sync intentionally — this helper runs inside asyncio.to_thread (see _bpp_to_estimate)
         try:
             proc = subprocess.run(
                 [
@@ -535,7 +555,7 @@ def _png_sample_bpp(
                 ],
                 input=png_data,
                 capture_output=True,
-                timeout=10,
+                timeout=_PNG_SAMPLE_TIMEOUT,
             )
             if proc.returncode == 0 and proc.stdout:
                 png_data = proc.stdout
@@ -559,8 +579,11 @@ def _png_sample_bpp(
         png_data = buf.getvalue()
         method = "oxipng"
 
-    # oxipng matches what the actual optimizer uses
-    oxipng_level = 4 if config.quality < 70 else 2
+    # Mirror optimizer's dimension-aware level cap (operates on the original image,
+    # not the sample, so estimation matches the actual run).
+    oxipng_level = (
+        2 if (orig_width * orig_height > LARGE_MP_THRESHOLD or config.quality >= 70) else 4
+    )
     optimized = oxipng.optimize_from_memory(png_data, level=oxipng_level)
     output_size = len(optimized)
     sample_pixels = sample_width * sample_height
