@@ -261,6 +261,15 @@ touches the baseline. Source: `bench/dashboard/build.py`.
 
 The dashboard is purely informational — it doesn't gate any CI; for that, use `bench-pr.yml`.
 
+**Memory measurements caveat:** `peak_rss_kb`, `parent_peak_rss_kb`, and `children_peak_rss_kb`
+are only per-case isolated under `--mode memory`. Under `--mode quick` (`repeat=1`), these fields
+reflect the process-wide RSS sampled at the end of each case's measurement window — there is no
+process restart between cases, so all cases in a quick run share the same accumulating heap.
+In practice this produces only 3–5 distinct RSS values across hundreds of cases (the RSS monotonically
+grows through the run). Comparing per-case RSS values from a quick run is meaningless; the dashboard
+annotates the "peak RSS" trend chart with a warning when any displayed run used quick mode.
+Use `--mode memory` for per-case isolated RSS analysis.
+
 ```bash
 # Build the dashboard locally
 python -m bench.dashboard.build --out-dir /tmp/dash

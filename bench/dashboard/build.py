@@ -197,6 +197,7 @@ def extract_run_record(
         "timestamp_unix": ts_int,
         "iso_date": iso_date,
         "subject": subject,
+        "mode": run_data.get("mode", "quick"),
         "n_cases": n_cases,
         "n_errors": n_errors,
         "by_format": _aggregate_by_format(stats),
