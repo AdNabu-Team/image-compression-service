@@ -1,17 +1,20 @@
-"""Tests for PNG-specific optimizer behaviour introduced in PR-E.
+"""Tests for PNG-specific optimizer behaviour introduced in PR-E and PR-F.
 
 Covers:
 - _read_png_dimensions: IHDR parsing without pixel decode
 - Dimension-aware oxipng level cap (large PNGs use level 2 even at aggressive quality)
 - pngquant early-exit: when pngquant shrinks >=50%, oxipng level is capped to 2
+- _read_apng_frame_count: acTL chunk parsing for animation budget gate
+- APNG preset re-differentiation: small APNGs use level 4 at HIGH/MEDIUM, large use level 2
 """
 
 import struct
 import zlib
+from unittest.mock import patch
 
 import pytest
 
-from optimizers.png import LARGE_MP_THRESHOLD, _read_png_dimensions
+from optimizers.png import LARGE_MP_THRESHOLD, _read_apng_frame_count, _read_png_dimensions
 
 
 # ---------------------------------------------------------------------------
@@ -220,3 +223,159 @@ def test_pngquant_early_exit_boundary_exactly_half():
         lossy_level = 2
 
     assert lossy_level == 2
+
+
+# ---------------------------------------------------------------------------
+# Helpers for APNG synthesis
+# ---------------------------------------------------------------------------
+
+
+def _chunk(t: bytes, d: bytes) -> bytes:
+    """Build a PNG chunk: 4-byte length + type + data + CRC."""
+    length = struct.pack(">I", len(d))
+    crc = struct.pack(">I", zlib.crc32(t + d) & 0xFFFFFFFF)
+    return length + t + d + crc
+
+
+def _make_apng_bytes(width: int, height: int, num_frames: int) -> bytes:
+    """Build a minimal but structurally valid APNG with acTL chunk.
+
+    Produces a PNG signature + IHDR + acTL + a single IDAT + IEND.
+    The IDAT encodes a 1x1 red pixel regardless of width/height so the
+    test stays cheap — the optimizer reads dimensions from IHDR and frame
+    count from acTL, not from the pixel data.
+    """
+    sig = b"\x89PNG\r\n\x1a\n"
+    ihdr_data = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    ihdr = _chunk(b"IHDR", ihdr_data)
+    # acTL: num_frames (uint32 BE) + num_plays (uint32 BE)
+    actl_data = struct.pack(">II", num_frames, 0)
+    actl = _chunk(b"acTL", actl_data)
+    # Minimal IDAT: a 1-row red pixel (filter byte 0 + RGB)
+    row = bytes([0, 255, 0, 0])
+    idat = _chunk(b"IDAT", zlib.compress(row))
+    iend = _chunk(b"IEND", b"")
+    return sig + ihdr + actl + idat + iend
+
+
+def _make_pillow_apng(width: int, height: int, num_frames: int) -> bytes:
+    """Build a real APNG using Pillow (valid IDAT + fcTL + fdAT structure)."""
+    from PIL import Image
+    import io
+
+    first = Image.new("RGB", (width, height), color=(255, 0, 0))
+    rest = [Image.new("RGB", (width, height), color=(0, 255, 0)) for _ in range(num_frames - 1)]
+    buf = io.BytesIO()
+    first.save(buf, format="PNG", save_all=True, append_images=rest, loop=0)
+    return buf.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# _read_apng_frame_count
+# ---------------------------------------------------------------------------
+
+
+def test_read_apng_frame_count_basic():
+    """acTL with num_frames=7 must be parsed and returned correctly."""
+    apng = _make_apng_bytes(100, 50, 7)
+    assert _read_apng_frame_count(apng) == 7
+
+
+def test_read_apng_frame_count_single_frame():
+    """acTL with num_frames=1 (single-frame APNG) is returned as-is."""
+    apng = _make_apng_bytes(64, 64, 1)
+    assert _read_apng_frame_count(apng) == 1
+
+
+def test_read_apng_frame_count_falls_back_to_one():
+    """Static PNG without acTL must return 1 (safe fallback)."""
+    static_png = _make_png(50, 50)
+    assert _read_apng_frame_count(static_png) == 1
+
+
+def test_read_apng_frame_count_pillow_apng():
+    """Real Pillow-generated 3-frame APNG must be counted correctly."""
+    apng = _make_pillow_apng(10, 10, 3)
+    assert _read_apng_frame_count(apng) == 3
+
+
+# ---------------------------------------------------------------------------
+# APNG preset re-differentiation via animation pixel-budget
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_apng_small_uses_level_4_high_preset():
+    """Small APNG at quality=40 (HIGH) must use oxipng level 4."""
+    from optimizers.png import PngOptimizer
+    from schemas import OptimizationConfig
+
+    # 10x10 x 2 frames = 200 total pixel-frames, well under 4M budget
+    apng = _make_pillow_apng(10, 10, 2)
+
+    opt = PngOptimizer()
+    levels_called = []
+    original_run = opt._run_oxipng
+
+    def capture(data, level=2):
+        levels_called.append(level)
+        return original_run(data, level)
+
+    with patch.object(opt, "_run_oxipng", side_effect=capture):
+        result = await opt.optimize(apng, OptimizationConfig(quality=40, png_lossy=True))
+
+    assert result.format == "apng"
+    assert levels_called == [4], f"expected [4], got {levels_called}"
+
+
+@pytest.mark.asyncio
+async def test_apng_large_uses_level_2_high_preset():
+    """APNG whose total pixel-frames exceed 4M must use oxipng level 2 even at quality=40."""
+    from optimizers.png import PngOptimizer
+    from schemas import OptimizationConfig
+
+    # Use a small synthetic APNG but mock _read_apng_frame_count to simulate a large animation.
+    # 100x100 * 500 frames = 5_000_000 total pixel-frames (> LARGE_MP_THRESHOLD)
+    apng = _make_pillow_apng(100, 100, 2)  # real bytes so oxipng won't error
+
+    opt = PngOptimizer()
+    levels_called = []
+    original_run = opt._run_oxipng
+
+    def capture(data, level=2):
+        levels_called.append(level)
+        return original_run(data, level)
+
+    # 100*100*500 = 5_000_000 > LARGE_MP_THRESHOLD=4_000_000 → must use level 2
+    with (
+        patch("optimizers.png._read_apng_frame_count", return_value=500),
+        patch.object(opt, "_run_oxipng", side_effect=capture),
+    ):
+        result = await opt.optimize(apng, OptimizationConfig(quality=40, png_lossy=True))
+
+    assert result.format == "apng"
+    assert levels_called == [2], f"expected [2], got {levels_called}"
+
+
+@pytest.mark.asyncio
+async def test_apng_lossless_quality_uses_level_2():
+    """quality >= 70 (LOW preset) must always use level 2 regardless of APNG size."""
+    from optimizers.png import PngOptimizer
+    from schemas import OptimizationConfig
+
+    # Small APNG — would qualify for level 4 by size, but quality=80 overrides
+    apng = _make_pillow_apng(10, 10, 2)
+
+    opt = PngOptimizer()
+    levels_called = []
+    original_run = opt._run_oxipng
+
+    def capture(data, level=2):
+        levels_called.append(level)
+        return original_run(data, level)
+
+    with patch.object(opt, "_run_oxipng", side_effect=capture):
+        result = await opt.optimize(apng, OptimizationConfig(quality=80, png_lossy=False))
+
+    assert result.format == "apng"
+    assert levels_called == [2], f"expected [2], got {levels_called}"

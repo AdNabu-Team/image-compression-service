@@ -14,6 +14,20 @@ from utils.subprocess_runner import run_tool
 LARGE_MP_THRESHOLD = 4_000_000  # pixels
 
 
+def _read_apng_frame_count(data: bytes) -> int:
+    """Return the APNG num_frames from the acTL chunk, or 1 if not found.
+
+    Searches the first 4 KB for the 'acTL' marker — acTL must precede IDAT and
+    is conventionally right after IHDR, so 4 KB is plenty.
+    """
+    head = data[:4096]
+    idx = head.find(b"acTL")
+    if idx < 0 or idx + 8 > len(head):
+        return 1
+    # acTL data starts 4 bytes after the type marker (chunk length field is 4 bytes BEFORE the type)
+    return int.from_bytes(head[idx + 4 : idx + 8], "big")
+
+
 def _read_png_dimensions(data: bytes) -> tuple[int, int]:
     """Read width/height from the IHDR chunk without decoding pixels.
 
@@ -41,10 +55,9 @@ class PngOptimizer(BaseOptimizer):
     - quality < 70:  256 max colors, floor=1, speed=4, oxipng level=4 (moderate, capped at 2 for large PNGs)
     - quality >= 70: lossless only, oxipng level=2 (gentle)
 
-    APNG path always uses oxipng level=2 regardless of quality preset. Level 4's
-    24 filter trials per frame add ~2s on xlarge animations with minimal gain:
-    frame chunks share dictionaries, so filter optimization yields less than for
-    static PNG where every byte is in a single IDAT stream.
+    APNG path: level 4 only when total pixel-frames (W × H × N_frames) fit
+    within the same 4 MP budget used for static PNG, AND quality < 70. Otherwise
+    level 2 — long animations cannot afford 24 filter trials per fdAT chunk.
 
     pyoxipng 9.x uses Rust rayon for parallel filter trials by default (all CPUs).
     There is no explicit threads parameter in the public API — parallelism is
@@ -87,10 +100,18 @@ class PngOptimizer(BaseOptimizer):
 
         # APNG or lossless-only: skip pngquant
         if animated or not config.png_lossy:
-            # APNG: always use level 2 — level 4's 24 filter trials per frame
-            # add ~2s on xlarge animations with little gain (frames share
-            # dictionaries, so filter optimization matters less than for static PNG).
-            level = 2 if animated else oxipng_level
+            if animated:
+                # Total animation cost scales with W * H * num_frames. Reuse the same
+                # pixel-budget gate as static PNG: under 4 MP total work units, level 4's
+                # 24 filter trials are affordable; over that, fall back to level 2.
+                num_frames = _read_apng_frame_count(data_clean)
+                total_pixel_frames = width * height * num_frames
+                if config.quality < 70 and total_pixel_frames <= LARGE_MP_THRESHOLD:
+                    level = 4
+                else:
+                    level = 2
+            else:
+                level = oxipng_level
             optimized = await asyncio.to_thread(self._run_oxipng, data_clean, level)
             return self._build_result(data, optimized, "oxipng")
 
