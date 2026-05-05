@@ -129,9 +129,10 @@ def test_new_peak_rss_includes_children(png_case_bytes):
     assert new["children_peak_rss_kb"] > 0
 
 
-def test_parallelism_above_one_for_optimizers_using_asyncio_gather(png_case_bytes):
-    """PngOptimizer runs pngquant + oxipng in parallel via asyncio.gather.
-    Parallelism should exceed 1 — the legacy bench couldn't detect this.
+def test_parallelism_above_one_via_subprocess_overlap(png_case_bytes):
+    """PngOptimizer's pngquant subprocess overlaps with the Python event loop
+    during the to_thread() oxipng call, so total CPU time exceeds wall time.
+    Parallelism should exceed 1.0 — the legacy bench couldn't detect this.
     """
     data, config = png_case_bytes
     new = _new_measure(data, config)

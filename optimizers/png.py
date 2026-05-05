@@ -18,15 +18,25 @@ class PngOptimizer(BaseOptimizer):
     3. Otherwise → pngquant → oxipng on result
     4. pngquant exit code 99 (quality threshold not met) → fallback to oxipng on original
 
-    Quality controls aggressiveness:
-    - quality < 50:  64 max colors, floor=1, speed=3, oxipng level=4 (aggressive)
-    - quality < 70:  256 max colors, floor=1, speed=4, oxipng level=4 (moderate)
-    - quality >= 70: lossless only, oxipng level=2 (gentle)
+    Quality knobs (when png_lossy=True; lossless mode skips pngquant entirely):
+    - quality < 50:  pngquant 64 colors, speed=3 + oxipng level=4 (aggressive)
+    - quality < 70:  pngquant 256 colors, speed=4 + oxipng level=4 (moderate)
+    - quality >= 70: pngquant 256 colors, speed=4 + oxipng level=2 (gentle filters,
+                     the same lossless squeeze the lossless path uses)
 
-    APNG path always uses oxipng level=2 regardless of quality preset. Level 4's
-    24 filter trials per frame add ~2s on xlarge animations with minimal gain:
-    frame chunks share dictionaries, so filter optimization yields less than for
-    static PNG where every byte is in a single IDAT stream.
+    Lossless path (animated PNG, or png_lossy=False) skips pngquant and runs
+    oxipng on the metadata-stripped original. APNG always uses level=2 — frame
+    chunks share dictionaries, so level=4's 24 filter trials per fdAT chunk add
+    cost without proportionate gain.
+
+    Result selection: pngquant+oxipng is compared against the metadata-stripped
+    original; the smaller wins, with `_build_result()` enforcing output ≤ input as
+    a final safety net. We do *not* compute a separate oxipng-only-on-original
+    baseline to compare against — bench data (commit 377d723) showed it was
+    discarded in 56/60 cases, so the second oxipng pass is a measurable cost for a
+    rare marginal win. On inputs where pngquant inflates due to dithering
+    (`len(lossy_optimized) > len(data_clean)`), we fall through to the lossless
+    path explicitly.
     """
 
     format = ImageFormat.PNG
