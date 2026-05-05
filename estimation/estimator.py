@@ -189,6 +189,7 @@ async def _estimate_exact(
         result.optimized_size,
         reduction,
         result.method,
+        path="exact",
     )
 
 
@@ -269,6 +270,7 @@ async def _estimate_by_sample(
             file_size,
             0.0,
             "none",
+            path="generic_fallback_sample",
         )
 
     # Extrapolate output BPP to original pixel count
@@ -292,6 +294,7 @@ async def _estimate_by_sample(
         estimated_size,
         reduction,
         result.method,
+        path="generic_fallback_sample",
     )
 
 
@@ -356,6 +359,7 @@ async def _bpp_to_estimate(
         estimated_size,
         reduction,
         method,
+        path="direct_encode_sample",
     )
 
 
@@ -698,6 +702,7 @@ async def estimate_from_thumbnail(
             0.0,
             "none",
             confidence="medium",
+            path="direct_encode_sample",
         )
 
     # Extrapolate BPP
@@ -719,6 +724,7 @@ async def estimate_from_thumbnail(
         reduction,
         result.method,
         confidence="medium",
+        path="direct_encode_sample",
     )
 
 
@@ -742,6 +748,7 @@ def _build_estimate(
     reduction: float,
     method: str,
     confidence: str = "high",
+    path: str | None = None,
 ) -> EstimateResponse:
     """Build an EstimateResponse with standard field derivations."""
     return EstimateResponse(
@@ -756,6 +763,7 @@ def _build_estimate(
         method=method,
         already_optimized=reduction == 0,
         confidence=confidence,
+        path=path,
     )
 
 
