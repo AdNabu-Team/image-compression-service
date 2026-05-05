@@ -237,30 +237,130 @@ class BmpOptimizer(BaseOptimizer):
 def _rle8_encode_row(row: bytes, out: bytearray) -> None:
     """RLE8-encode a single row of pixel indices into *out*.
 
-    Uses encoded runs for repeats and absolute mode for non-repeating
-    sequences (count >= 3). Short non-repeating runs (1-2) are emitted
-    as encoded runs of length 1 or 2 for simplicity.
+    Uses numpy to detect run boundaries in a single C-level pass, then
+    walks the pre-computed segment list. For rows shorter than 65 bytes
+    (uncommon in practice) the pure-Python fallback is used because numpy
+    setup overhead dominates at that scale.
+
+    Encoding rules match BMP BI_RLE8 exactly:
+    - Runs >= 3 identical bytes  -> encoded run: [count, value], capped at 255
+    - Short sequences (run < 3)  -> accumulate into a literal block up to 255 bytes
+        - Literal >= 3 bytes     -> absolute mode: [0x00, count, data, pad-to-even]
+        - Literal < 3 bytes      -> individual encoded runs of length 1
     """
     n = len(row)
-    i = 0
+    if n == 0:
+        return
 
+    # For very short rows the numpy call overhead outweighs the savings.
+    if n < 65:
+        _rle8_encode_row_python(row, out, n)
+        return
+
+    arr = np.frombuffer(row, dtype=np.uint8)
+
+    # Single C-level pass: locate every position where the value changes.
+    change_pos = np.where(np.diff(arr) != 0)[0] + 1
+    num_segs = len(change_pos) + 1
+
+    # Build segment start indices and lengths as numpy arrays, then convert
+    # to Python lists for the tight output-assembly loop (list indexing is
+    # faster than numpy scalar extraction inside a Python for-loop).
+    seg_starts = np.empty(num_segs, dtype=np.int32)
+    seg_starts[0] = 0
+    if num_segs > 1:
+        seg_starts[1:] = change_pos
+
+    seg_lengths_np = np.empty(num_segs, dtype=np.int32)
+    if num_segs > 1:
+        seg_lengths_np[:-1] = np.diff(seg_starts)
+    seg_lengths_np[-1] = n - int(seg_starts[-1])
+
+    seg_starts_list = seg_starts.tolist()
+    seg_lengths_list = seg_lengths_np.tolist()
+    vals_list = arr[seg_starts].tolist()  # pixel value for each segment
+
+    seg_idx = 0
+    pos = 0  # current byte position in *row*, mirrors 'i' in the Python version
+
+    while seg_idx < num_segs:
+        seg_len = seg_lengths_list[seg_idx]
+        val = vals_list[seg_idx]
+
+        if seg_len >= 3:
+            # --- Encoded run mode, chunked to BMP max of 255 ---
+            remaining = seg_len
+            while remaining > 0:
+                chunk = min(remaining, 255)
+                out.append(chunk)
+                out.append(val)
+                remaining -= chunk
+            pos += seg_len
+            seg_idx += 1
+        else:
+            # --- Literal accumulation: gather short-run segments ---
+            # Replicates the original byte-by-byte peek logic: accumulate
+            # until hitting a run of >= 3 or reaching 255 bytes.  A run-of-2
+            # segment that straddles the 255-byte boundary is split, matching
+            # the original's single-byte advance behaviour.
+            lit_start = pos
+            pos += seg_len
+            seg_idx += 1
+
+            while seg_idx < num_segs:
+                next_len = seg_lengths_list[seg_idx]
+                if next_len >= 3:
+                    break  # next is a long run — end the literal block
+                available = 255 - (pos - lit_start)
+                if available <= 0:
+                    break
+                if next_len <= available:
+                    pos = seg_starts_list[seg_idx] + next_len
+                    seg_idx += 1
+                else:
+                    # Partial segment: take only 'available' bytes, leave the rest.
+                    # Mutate the list entry so the remainder is processed next time.
+                    split_pos = seg_starts_list[seg_idx] + available
+                    pos = split_pos
+                    seg_starts_list[seg_idx] = split_pos
+                    seg_lengths_list[seg_idx] = next_len - available
+                    break
+
+            lit_len = pos - lit_start
+            if lit_len >= 3:
+                # Absolute mode: [0x00, count, data, optional pad]
+                out.append(0x00)
+                out.append(lit_len)
+                out.extend(row[lit_start : lit_start + lit_len])
+                if lit_len % 2 != 0:
+                    out.append(0x00)
+            else:
+                # Too short for absolute mode — individual encoded runs
+                for j in range(lit_start, lit_start + lit_len):
+                    out.append(1)
+                    out.append(row[j])
+
+
+def _rle8_encode_row_python(row: bytes, out: bytearray, n: int) -> None:
+    """Pure-Python RLE8 row encoder — used for short rows (< 65 bytes).
+
+    Identical logic to the original implementation; kept as a fallback because
+    numpy call overhead dominates at small row widths.
+    """
+    i = 0
     while i < n:
-        # Count consecutive identical bytes
         val = row[i]
         run = 1
         while i + run < n and row[i + run] == val and run < 255:
             run += 1
 
         if run >= 3:
-            # Encoded run: [count, value]
             out.extend(bytes([run, val]))
             i += run
         else:
-            # Collect non-repeating literal sequence
             lit_start = i
             i += run
             while i < n:
-                # Peek ahead: if next is a run of 3+, stop literal
                 val2 = row[i]
                 peek = 1
                 while i + peek < n and row[i + peek] == val2 and peek < 3:
@@ -273,13 +373,11 @@ def _rle8_encode_row(row: bytes, out: bytearray) -> None:
 
             lit_len = i - lit_start
             if lit_len >= 3:
-                # Absolute mode: [0x00, count, data...] padded to even
                 out.append(0x00)
                 out.append(lit_len)
                 out.extend(row[lit_start : lit_start + lit_len])
                 if lit_len % 2 != 0:
-                    out.append(0x00)  # pad to even
+                    out.append(0x00)
             else:
-                # Too short for absolute mode — emit as encoded runs
                 for j in range(lit_start, lit_start + lit_len):
                     out.extend(bytes([1, row[j]]))
