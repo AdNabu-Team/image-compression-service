@@ -19,7 +19,7 @@ class PngOptimizer(BaseOptimizer):
     4. pngquant exit code 99 (quality threshold not met) → fallback to oxipng on original
 
     Quality controls aggressiveness:
-    - quality < 50:  64 max colors, floor=1, speed=1, oxipng level=6 (aggressive)
+    - quality < 50:  64 max colors, floor=1, speed=3, oxipng level=4 (aggressive)
     - quality < 70:  256 max colors, floor=1, speed=4, oxipng level=4 (moderate)
     - quality >= 70: lossless only, oxipng level=2 (gentle)
     """
@@ -42,11 +42,9 @@ class PngOptimizer(BaseOptimizer):
 
         # Quality-dependent oxipng level: higher = slower but better compression
         # Level 6 = 180 filter trials (too slow for API use on large images)
-        # Level 4 = 24 trials (good tradeoff for aggressive preset)
+        # Level 4 = 24 trials (good tradeoff for aggressive/moderate presets)
         # Level 3 is NOT used — it misses critical filters for screenshots
-        if config.quality < 50:
-            oxipng_level = 4
-        elif config.quality < 70:
+        if config.quality < 70:
             oxipng_level = 4
         else:
             oxipng_level = 2
@@ -65,10 +63,9 @@ class PngOptimizer(BaseOptimizer):
             max_colors = 256
             speed = 4  # default balanced
 
-        # Lossy path: run pngquant and oxipng-baseline concurrently
-        (pngquant_result, success), oxipng_only = await asyncio.gather(
-            self._run_pngquant(data_clean, config.quality, max_colors, speed),
-            asyncio.to_thread(self._run_oxipng, data_clean, oxipng_level),
+        # Lossy path: run pngquant first, then oxipng on the result
+        pngquant_result, success = await self._run_pngquant(
+            data_clean, config.quality, max_colors, speed
         )
 
         if success and pngquant_result:
@@ -76,22 +73,14 @@ class PngOptimizer(BaseOptimizer):
             lossy_optimized = await asyncio.to_thread(
                 self._run_oxipng, pngquant_result, oxipng_level
             )
-            # Pick the smaller of lossy and lossless paths — pngquant can
-            # produce a larger file when dithering inflates palette PNGs.
-            use_lossy = len(lossy_optimized) <= len(oxipng_only)
+            # pngquant can inflate gradient/palette PNGs due to dithering;
+            # fall through to oxipng-on-original when that happens.
+            if len(lossy_optimized) <= len(data_clean):
+                return self._build_result(data, lossy_optimized, "pngquant + oxipng")
 
-            if use_lossy:
-                optimized = lossy_optimized
-                method = "pngquant + oxipng"
-            else:
-                optimized = oxipng_only
-                method = "oxipng"
-        else:
-            # pngquant couldn't meet quality threshold — lossless only
-            optimized = oxipng_only
-            method = "oxipng"
-
-        return self._build_result(data, optimized, method)
+        # pngquant failed, couldn't meet threshold, or produced bloat — lossless only
+        optimized = await asyncio.to_thread(self._run_oxipng, data_clean, oxipng_level)
+        return self._build_result(data, optimized, "oxipng")
 
     async def _run_pngquant(
         self,
