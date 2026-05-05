@@ -36,13 +36,13 @@ async def _read_upload_streaming(file: UploadFile) -> bytes:
         chunk = await file.read(_UPLOAD_CHUNK_SIZE)
         if not chunk:
             break
-        buf.extend(chunk)
-        if len(buf) > settings.max_file_size_bytes:
+        if len(buf) + len(chunk) > settings.max_file_size_bytes:
             raise FileTooLargeError(
-                f"File size exceeds limit of {settings.max_file_size_mb} MB",
-                file_size=len(buf),
+                f"File size exceeds limit of {settings.max_file_size_bytes} bytes",
+                file_size=len(buf) + len(chunk),
                 limit=settings.max_file_size_bytes,
             )
+        buf.extend(chunk)
     return bytes(buf)
 
 

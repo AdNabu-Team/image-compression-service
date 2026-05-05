@@ -17,6 +17,7 @@ import subprocess
 from PIL import Image
 
 from config import settings
+from optimizers.png import LARGE_MP_THRESHOLD
 from optimizers.router import optimize_image
 from optimizers.utils import clamp_quality
 from schemas import EstimateResponse, OptimizationConfig
@@ -580,10 +581,8 @@ def _png_sample_bpp(
 
     # Mirror optimizer's dimension-aware level cap (operates on the original image,
     # not the sample, so estimation matches the actual run).
-    # LARGE_MP_THRESHOLD must match the constant in optimizers/png.py.
-    _LARGE_MP_THRESHOLD = 4_000_000
     oxipng_level = (
-        2 if (orig_width * orig_height > _LARGE_MP_THRESHOLD or config.quality >= 70) else 4
+        2 if (orig_width * orig_height > LARGE_MP_THRESHOLD or config.quality >= 70) else 4
     )
     optimized = oxipng.optimize_from_memory(png_data, level=oxipng_level)
     output_size = len(optimized)

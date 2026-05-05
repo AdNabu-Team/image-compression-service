@@ -101,7 +101,7 @@ async def estimate(
     # Validate file size
     if len(data) > settings.max_file_size_bytes:
         raise FileTooLargeError(
-            f"File size {len(data)} bytes exceeds limit of {settings.max_file_size_mb} MB",
+            f"File size exceeds limit of {settings.max_file_size_bytes} bytes",
             file_size=len(data),
             limit=settings.max_file_size_bytes,
         )

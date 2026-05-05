@@ -36,12 +36,18 @@ async def lifespan(app: FastAPI):
             extra={"context": {"missing_tools": missing}},
         )
 
-    _cpu = os.cpu_count() or 0
-    if _cpu < 2:
+    _cpu = os.cpu_count()
+    if _cpu is not None and _cpu < 2:
         logger.warning(
-            f"Detected cpu_count={_cpu}; CompressionGate floor of 2 applied. "
+            f"Detected cpu_count={_cpu}; effective compression_semaphore_size="
+            f"{settings.compression_semaphore_size}. "
             "Pin Cloud Run --cpu>=2 for production.",
-            extra={"context": {"cpu_count": _cpu}},
+            extra={
+                "context": {
+                    "cpu_count": _cpu,
+                    "semaphore_size": settings.compression_semaphore_size,
+                }
+            },
         )
 
     yield

@@ -6,7 +6,6 @@ max_file_size_bytes, before the full body is buffered in RAM.
 
 import pytest
 
-from config import settings
 from exceptions import FileTooLargeError
 from routers.optimize import _UPLOAD_CHUNK_SIZE, _read_upload_streaming
 
@@ -31,15 +30,20 @@ class _FakeUploadFile:
 
 @pytest.mark.asyncio
 async def test_streaming_rejects_oversized_upload():
-    """A payload of max_file_size_bytes + 1 must raise FileTooLargeError."""
-    oversized = b"x" * (settings.max_file_size_bytes + 1)
+    """A payload of small_limit + 1 bytes must raise FileTooLargeError."""
+    from unittest.mock import patch
+
+    small_limit = 64 * 1024  # 64 KiB — avoids allocating 32 MB+ in CI
+    oversized = b"x" * (small_limit + 1)
     fake_file = _FakeUploadFile(oversized)
 
-    with pytest.raises(FileTooLargeError) as exc_info:
-        await _read_upload_streaming(fake_file)
+    with patch("routers.optimize.settings") as mock_settings:
+        mock_settings.max_file_size_bytes = small_limit
+        with pytest.raises(FileTooLargeError) as exc_info:
+            await _read_upload_streaming(fake_file)
 
-    assert exc_info.value.details["limit"] == settings.max_file_size_bytes
-    assert exc_info.value.details["file_size"] > settings.max_file_size_bytes
+    assert exc_info.value.details["limit"] == small_limit
+    assert exc_info.value.details["file_size"] > small_limit
 
 
 @pytest.mark.asyncio

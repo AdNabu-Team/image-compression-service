@@ -131,7 +131,7 @@ async def safe_check_rate_limit(client_ip: str, is_authenticated: bool) -> None:
     except Exception as e:
         global _rate_limit_redis_error_count
         _rate_limit_redis_error_count += 1
-        logger.error(
+        logger.exception(
             f"Rate limiter unavailable — fail-open allowed request: {e}",
             extra={
                 "context": {

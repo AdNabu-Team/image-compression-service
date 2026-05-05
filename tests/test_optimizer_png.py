@@ -16,7 +16,6 @@ import pytest
 
 from optimizers.png import LARGE_MP_THRESHOLD, _read_apng_frame_count, _read_png_dimensions
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -135,35 +134,36 @@ async def test_png_small_lossy_path_succeeds():
 
 @pytest.mark.asyncio
 async def test_png_large_synthetic_uses_level2():
-    """A PNG reported as large (> LARGE_MP_THRESHOLD) produces a valid result.
+    """An aggressive-quality PNG whose dimensions exceed LARGE_MP_THRESHOLD must use oxipng level 2.
 
-    We can't easily synthesise a real 4MP+ PNG in a unit test without large memory,
-    so we instead confirm that _read_png_dimensions correctly identifies the image as
-    large and that the optimizer produces a valid compressed output without error.
+    We synthesise a cheap real PNG (small pixels, compress_level=0 so bytes stay tiny) but
+    mock _read_png_dimensions to report dimensions above the threshold so the level-cap
+    branch fires without allocating a real 4MP image.  _run_oxipng is patched to capture
+    the level argument while still returning valid oxipng output.
     """
-    from optimizers.png import PngOptimizer, _read_png_dimensions
+    from optimizers.png import PngOptimizer
     from schemas import OptimizationConfig
 
-    # Build a PNG with IHDR claiming 2001x2001 (> 4M pixels) but a 1x1 IDAT
-    # body so the test stays cheap. The optimizer reads dimensions from the header,
-    # so the level cap triggers even on this synthetic image.
-    sig = b"\x89PNG\r\n\x1a\n"
+    # A tiny real PNG — oxipng can process it without error
+    png = _make_png(10, 10)
 
-    def chunk(t: bytes, d: bytes) -> bytes:
-        length = struct.pack(">I", len(d))
-        crc = struct.pack(">I", zlib.crc32(t + d) & 0xFFFFFFFF)
-        return length + t + d + crc
+    opt = PngOptimizer()
+    levels_called = []
+    original_run = opt._run_oxipng
 
-    # IHDR claims 2001x2001 (4_004_001 pixels — above threshold)
-    large_w, large_h = 2001, 2001
-    ihdr_data = struct.pack(">IIBBBBB", large_w, large_h, 8, 2, 0, 0, 0)
-    ihdr = chunk(b"IHDR", ihdr_data)
+    def capture(data, level=2):
+        levels_called.append(level)
+        return original_run(data, level)
 
-    # Verify our helper sees the right dimensions
-    header_bytes = sig + ihdr
-    w, h = _read_png_dimensions(header_bytes)
-    assert w == large_w and h == large_h
-    assert w * h > LARGE_MP_THRESHOLD
+    # Pretend the image is 2001x2001 (> LARGE_MP_THRESHOLD) even though the bytes are 10x10
+    with (
+        patch("optimizers.png._read_png_dimensions", return_value=(2001, 2001)),
+        patch.object(opt, "_run_oxipng", side_effect=capture),
+    ):
+        result = await opt.optimize(png, OptimizationConfig(quality=40, png_lossy=False))
+
+    assert result.format in ("png", "apng")
+    assert levels_called == [2], f"expected [2], got {levels_called}"
 
 
 # ---------------------------------------------------------------------------
@@ -260,8 +260,9 @@ def _make_apng_bytes(width: int, height: int, num_frames: int) -> bytes:
 
 def _make_pillow_apng(width: int, height: int, num_frames: int) -> bytes:
     """Build a real APNG using Pillow (valid IDAT + fcTL + fdAT structure)."""
-    from PIL import Image
     import io
+
+    from PIL import Image
 
     first = Image.new("RGB", (width, height), color=(255, 0, 0))
     rest = [Image.new("RGB", (width, height), color=(0, 255, 0)) for _ in range(num_frames - 1)]
