@@ -501,7 +501,7 @@ def _webp_sample_bpp(
     output_size = buf.tell()
     sample_pixels = sample_width * sample_height
 
-    return (output_size * 8 / sample_pixels, "pillow")
+    return (output_size * 8 / sample_pixels, f"pillow-m{method}")
 
 
 def _png_sample_bpp(

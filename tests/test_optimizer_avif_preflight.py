@@ -152,6 +152,44 @@ class TestParseAvifMetadata:
         _, _, mb = _parse_avif_metadata(data)
         assert mb == 8 + 4 + 500  # only the prof box
 
+    def test_meta_level_exif_sibling_counted(self):
+        """Exif box at the meta level (sibling of iprp) must be counted.
+
+        ISO/IEC 23008-12 allows Exif/xmp/xml boxes as direct children of meta,
+        not only inside ipco.  The previous early-return-on-width bug would walk
+        meta → iprp → ipco → ispe, find width != 0, and immediately return —
+        skipping Exif boxes that come AFTER iprp in the meta container.
+
+        Layout:
+            ftyp
+            meta (FullBox)
+                iprp
+                    ipco
+                        ispe (width=100, height=100)
+                Exif (~1000-byte body)   ← sibling of iprp, after ispe is found
+        """
+        # Build from the inside out
+        ispe = _box(b"ispe", _ispe_body(100, 100))
+        ipco = _box(b"ipco", ispe)
+        iprp = _box(b"iprp", ipco)
+
+        exif_body = b"\x00" * 1000
+        exif_box = _box(b"Exif", exif_body)
+        expected_exif_box_size = 8 + len(exif_body)  # 1008
+
+        # meta is a FullBox: 4-byte version+flags prefix, then iprp, then Exif sibling
+        meta_body = _fullbox_prefix() + iprp + exif_box
+        meta = _box(b"meta", meta_body)
+        ftyp = _box(b"ftyp", b"avif" + b"\x00" * 4 + b"avif")
+        data = ftyp + meta
+
+        w, h, mb = _parse_avif_metadata(data)
+        assert (w, h) == (100, 100), "ispe dimensions must still be found"
+        assert mb == expected_exif_box_size, (
+            f"Exif sibling of iprp at meta level must be counted; "
+            f"got {mb}, expected {expected_exif_box_size}"
+        )
+
 
 class TestParseAvifMetadataEdgeCases:
     def test_empty_input_returns_zeros(self):

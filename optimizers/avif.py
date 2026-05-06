@@ -97,9 +97,8 @@ def _walk_boxes(
             width, height, meta_bytes = _walk_boxes(
                 data, inner_start, body_end, depth + 1, width, height, meta_bytes
             )
-            if width != 0:
-                # Found ispe — no need to scan further siblings at this level
-                return width, height, meta_bytes
+            # Don't early-return on width != 0 — Exif/xmp siblings of iprp at the
+            # meta level still need to be counted toward meta_bytes.
 
         pos += actual_size
 
