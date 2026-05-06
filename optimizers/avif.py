@@ -8,7 +8,9 @@ from schemas import OptimizationConfig, OptimizeResult
 from utils.format_detect import ImageFormat
 
 # Metadata box types whose byte count contributes to strippable overhead.
-# "colr" is handled separately — only ICC-profile colour boxes ("prof") count.
+# "colr" boxes are intentionally excluded: the strip path preserves the ICC
+# profile (icc_profile= kwarg) and nclx is baked into the bitstream — neither
+# is actually removed, so counting them would over-inflate meta_bytes.
 _METADATA_BOX_TYPES = frozenset({b"Exif", b"xml ", b"xmp ", b"mime"})
 
 # ISOBMFF container types we recurse into (limited — avoids over-parsing).
@@ -24,7 +26,9 @@ def _parse_avif_metadata(data: bytes) -> tuple[int, int, int]:
 
     Returns:
         (width, height, metadata_bytes) where width/height==0 means parse failed
-        and the caller should fall back to the decode path.
+        and the caller should fall back to the decode path.  Only truly strippable
+        boxes (Exif, xml, xmp, mime) are counted; colr boxes (ICC profile or nclx
+        signalling) are excluded because the strip path preserves them.
 
     Box layout reference (ISOBMFF):
       - 4 bytes big-endian uint32 size  (1 = extended, 0 = to EOF)
@@ -83,12 +87,6 @@ def _walk_boxes(
         elif box_type in _METADATA_BOX_TYPES:
             meta_bytes += actual_size
 
-        elif box_type == b"colr":
-            # Only ICC profile colour boxes ("prof") are strippable overhead;
-            # "nclx" is signalling data baked into the bitstream, not removable.
-            if body_end >= body_start + 4 and data[body_start : body_start + 4] == b"prof":
-                meta_bytes += actual_size
-
         elif box_type in _CONTAINER_TYPES and depth < 3:
             inner_start = body_start
             if box_type == b"meta":
@@ -112,6 +110,8 @@ def _should_skip_avif_optimization(data: bytes, config: OptimizationConfig) -> b
     - HIGH (quality < 50):  never skip — re-encode at q=50 reliably shrinks.
     - MEDIUM (50 <= quality < 70): skip if input BPP < 0.5 (AVIF q=70 floor).
     - LOW (quality >= 70, strip-only): skip if strippable metadata < 500 B.
+      Strippable = Exif/xml/xmp/mime only; colr boxes (ICC, nclx) are preserved
+      by the strip path and are therefore NOT counted toward the threshold.
 
     Skipping saves the full libavif decode cost (~300-2000 ms per megapixel).
     """

@@ -111,12 +111,14 @@ class TestParseAvifMetadata:
         # 8+50 + 8+30 = 96
         assert mb == 96
 
-    def test_colr_prof_counted(self):
-        # colr box with 'prof' colour type = ICC profile — strippable
+    def test_colr_prof_not_counted(self):
+        # colr box with 'prof' colour type = ICC profile.
+        # The strip path preserves ICC (icc_profile= kwarg), so it is NOT
+        # strippable overhead and must NOT be counted toward meta_bytes.
         prof_colr = _colr_box(b"prof", b"\x00" * 200)
         data = _minimal_avif(100, 100, extra_boxes=prof_colr)
         _, _, mb = _parse_avif_metadata(data)
-        assert mb == 8 + 4 + 200  # full colr box size
+        assert mb == 0  # ICC profile is preserved, not stripped
 
     def test_colr_nclx_not_counted(self):
         # colr box with 'nclx' colour type = signalling data, not strippable
@@ -145,12 +147,12 @@ class TestParseAvifMetadata:
         assert mb == 0
 
     def test_colr_prof_and_nclx_combined(self):
-        """Only prof colr counted, not nclx."""
+        """Neither prof nor nclx colr boxes are counted — both are preserved by strip."""
         prof_colr = _colr_box(b"prof", b"\x00" * 500)
         nclx_colr = _colr_box(b"nclx", b"\x00" * 10)
         data = _minimal_avif(100, 100, extra_boxes=prof_colr + nclx_colr)
         _, _, mb = _parse_avif_metadata(data)
-        assert mb == 8 + 4 + 500  # only the prof box
+        assert mb == 0  # ICC (prof) is preserved by strip; nclx is bitstream data
 
     def test_meta_level_exif_sibling_counted(self):
         """Exif box at the meta level (sibling of iprp) must be counted.
@@ -263,12 +265,23 @@ class TestShouldSkipAvifOptimization:
         config = OptimizationConfig(quality=80, strip_metadata=True)
         assert _should_skip_avif_optimization(data, config) is True
 
-    def test_low_does_not_skip_when_large_metadata(self):
-        # Add a 604-byte ICC profile colr box (8+4+592 = 604)
-        prof_colr = _colr_box(b"prof", b"\x00" * 592)
-        data = _minimal_avif(100, 100, extra_boxes=prof_colr)
+    def test_low_does_not_skip_when_large_strippable_metadata(self):
+        # 604-byte Exif box (8+596 = 604) — genuinely strippable, above threshold
+        exif_box = _box(b"Exif", b"\x00" * 596)
+        data = _minimal_avif(100, 100, extra_boxes=exif_box)
         config = OptimizationConfig(quality=80, strip_metadata=True)
         assert _should_skip_avif_optimization(data, config) is False
+
+    def test_low_skips_when_only_icc_profile(self):
+        # ICC profile colr box: large in bytes, but the strip path PRESERVES it —
+        # so meta_bytes stays 0 and the LOW skip rule fires correctly.
+        # This is the calibration bug fixed in iter3: real-world AVIFs with only
+        # an ICC profile were incorrectly proceeding to decode+strip+encode,
+        # returning "none" after wasted CPU.
+        prof_colr = _colr_box(b"prof", b"\x00" * 3140)  # ~3KB ICC, like Earth_Apollo_17
+        data = _minimal_avif(100, 100, extra_boxes=prof_colr)
+        config = OptimizationConfig(quality=80, strip_metadata=True)
+        assert _should_skip_avif_optimization(data, config) is True
 
     def test_low_skips_when_small_metadata(self):
         # 400 bytes of metadata — below the 500 B threshold
