@@ -27,8 +27,9 @@ def _parse_avif_metadata(data: bytes) -> tuple[int, int, int]:
     Returns:
         (width, height, metadata_bytes) where width/height==0 means parse failed
         and the caller should fall back to the decode path.  Only truly strippable
-        boxes (Exif, xml, xmp, mime) are counted; colr boxes (ICC profile or nclx
-        signalling) are excluded because the strip path preserves them.
+        boxes (Exif, xml, xmp, mime) are counted; colr boxes are excluded for
+        both kinds (kind='prof' = ICC profile, kind='nclx' = bitstream signalling)
+        because the strip path preserves them.
 
     Box layout reference (ISOBMFF):
       - 4 bytes big-endian uint32 size  (1 = extended, 0 = to EOF)
@@ -110,8 +111,9 @@ def _should_skip_avif_optimization(data: bytes, config: OptimizationConfig) -> b
     - HIGH (quality < 50):  never skip — re-encode at q=50 reliably shrinks.
     - MEDIUM (50 <= quality < 70): skip if input BPP < 0.5 (AVIF q=70 floor).
     - LOW (quality >= 70, strip-only): skip if strippable metadata < 500 B.
-      Strippable = Exif/xml/xmp/mime only; colr boxes (ICC, nclx) are preserved
-      by the strip path and are therefore NOT counted toward the threshold.
+      Strippable = Exif/xml/xmp/mime only; colr boxes are preserved by the
+      strip path (kind='prof' ICC kept via icc_profile kwarg, kind='nclx' lives
+      in the bitstream) and are therefore NOT counted toward the threshold.
 
     Skipping saves the full libavif decode cost (~300-2000 ms per megapixel).
     """
