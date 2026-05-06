@@ -487,19 +487,21 @@ def _webp_sample_bpp(
 ) -> tuple[float, str]:
     """Encode a WebP sample at target quality and return output BPP.
 
-    Matches the WebP optimizer's Pillow path: lossy encode at target quality
-    with method=4 for good compression.
+    Matches the WebP optimizer's Pillow path: lossy encode at target quality.
+    Method mirrors WebpOptimizer._webp_method — 4 for HIGH (quality < 50),
+    3 for MEDIUM/LOW (quality >= 50).
     """
     sample = img.resize((sample_width, sample_height), Image.LANCZOS)
     if sample.mode not in ("RGB", "RGBA", "L"):
         sample = sample.convert("RGB")
 
+    method = 4 if config.quality < 50 else 3
     buf = io.BytesIO()
-    sample.save(buf, format="WEBP", quality=config.quality, method=4)
+    sample.save(buf, format="WEBP", quality=config.quality, method=method)
     output_size = buf.tell()
     sample_pixels = sample_width * sample_height
 
-    return (output_size * 8 / sample_pixels, "pillow")
+    return (output_size * 8 / sample_pixels, f"pillow-m{method}")
 
 
 def _png_sample_bpp(
