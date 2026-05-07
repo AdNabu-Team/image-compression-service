@@ -1,0 +1,156 @@
+"""Versioned model artifact schema for the fitted BPP estimator.
+
+Mirrors the ``bench/corpus/manifest.py`` precedent: ``@dataclass(frozen=True, slots=True)``
+with a ``from_json()`` classmethod.  No Pydantic — frozen dataclasses have ~10× lower
+instantiation overhead for a once-per-process load.
+
+Only ``PngModel`` is defined here for Phase 1.  ``JpegModel`` is deferred to Phase 2.
+
+``optimizer_quality_logic_sha256`` is intentionally omitted from this MVP (Phase 1 scope cut).
+It will be added in Phase 2 once ``bench/fit/png.py`` is implemented.
+
+``Loaded`` and ``LoadFailed`` live here (not in ``__init__.py``) so that ``PngModel.from_json``
+can return them without a circular import.  ``estimation/models/__init__.py`` re-exports them.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Literal
+
+logger = logging.getLogger("pare.estimation.models")
+
+# The only model_version this code understands.  Artifacts with a different version are
+# rejected at load time so stale JSON from a previous fit does not silently corrupt predictions.
+_SUPPORTED_MODEL_VERSION = 1
+
+
+@dataclass(frozen=True, slots=True)
+class Loaded:
+    """Successful model load result."""
+
+    model: PngModel
+
+
+@dataclass(frozen=True, slots=True)
+class LoadFailed:
+    """Failed model load result.
+
+    ``reason`` values:
+
+    - ``"missing"``          — artifact file not found.
+    - ``"parse_error"``      — JSON is malformed or does not match the expected schema.
+    - ``"version_mismatch"`` — ``model_version`` field differs from the supported version.
+    - ``"other"``            — any other unexpected exception during load.
+    """
+
+    reason: Literal["missing", "parse_error", "version_mismatch", "other"]
+
+
+@dataclass(frozen=True, slots=True)
+class PngModel:
+    """Fitted BPP curve artifact for PNG estimation.
+
+    Fields
+    ------
+    model_version : int
+        Schema version.  Must equal 1; any other value → ``LoadFailed("version_mismatch")``.
+    format : str
+        Always ``"png"`` for this class.
+    features : list[str]
+        Ordered feature names in the order the ``coefficients`` vector expects them.
+    supported_modes : list[str]
+        Pillow image modes the model was trained on.  Modes outside this list → fallback.
+    scaler : dict[str, list[float]]
+        ``StandardScaler`` params: ``{"mean": [...], "scale": [...]}``.
+    coefficients : dict[str, Any]
+        Regression coefficients.  Shape is implementation-defined by ``bench/fit/png.py``.
+    knot_log10_unique_colors : float
+        Piecewise-linear knot position on the ``log10_unique_colors`` axis (~3.3 = 2000 colors).
+    training_envelope : dict[str, list[float]]
+        **Forensic only** — documents the corpus envelope used during training.
+        Not used at runtime; routing clips are hardcoded in ``png_features.py``.
+    training_corpus_sha256 : str
+        SHA-256 of the training corpus manifest file.
+    git_sha : str
+        Git commit SHA at fit time.
+    fit_environment : dict[str, Any]
+        ``{"sklearn_version": "...", "numpy_version": "...", "openblas_threads": 1}``.
+    created_at : str
+        ISO-8601 timestamp of the fit run.
+    """
+
+    model_version: int
+    format: str
+    features: list[str]
+    supported_modes: list[str]
+    scaler: dict[str, list[float]]
+    coefficients: dict[str, Any]
+    knot_log10_unique_colors: float
+    training_envelope: dict[str, list[float]]
+    training_corpus_sha256: str
+    git_sha: str
+    fit_environment: dict[str, Any]
+    created_at: str
+
+    @classmethod
+    def from_json(cls, path: Path) -> Loaded | LoadFailed:
+        """Load and validate a ``PngModel`` from a JSON file at *path*.
+
+        Returns ``Loaded(model)`` on success.  Returns ``LoadFailed(reason)`` on any of:
+
+        - ``path`` does not exist → ``"missing"``
+        - JSON parse error or schema mismatch → ``"parse_error"``
+        - ``model_version != 1`` → ``"version_mismatch"``
+        - Any other unexpected exception → ``"other"``
+
+        Never raises.
+        """
+        if not path.exists():
+            logger.warning("PngModel artifact not found: %s", path)
+            return LoadFailed(reason="missing")
+
+        try:
+            raw: dict[str, Any] = json.loads(path.read_text())
+        except (json.JSONDecodeError, OSError, ValueError) as exc:
+            logger.warning("PngModel artifact parse error (%s): %s", path, exc)
+            return LoadFailed(reason="parse_error")
+
+        try:
+            version = raw["model_version"]
+        except (KeyError, TypeError) as exc:
+            logger.warning("PngModel artifact missing model_version (%s): %s", path, exc)
+            return LoadFailed(reason="parse_error")
+
+        if version != _SUPPORTED_MODEL_VERSION:
+            logger.warning(
+                "PngModel artifact version mismatch: expected %d, got %r (%s)",
+                _SUPPORTED_MODEL_VERSION,
+                version,
+                path,
+            )
+            return LoadFailed(reason="version_mismatch")
+
+        try:
+            model = cls(
+                model_version=int(raw["model_version"]),
+                format=str(raw["format"]),
+                features=list(raw["features"]),
+                supported_modes=list(raw["supported_modes"]),
+                scaler=dict(raw["scaler"]),
+                coefficients=dict(raw["coefficients"]),
+                knot_log10_unique_colors=float(raw["knot_log10_unique_colors"]),
+                training_envelope=dict(raw.get("training_envelope") or {}),
+                training_corpus_sha256=str(raw["training_corpus_sha256"]),
+                git_sha=str(raw["git_sha"]),
+                fit_environment=dict(raw["fit_environment"]),
+                created_at=str(raw["created_at"]),
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            logger.warning("PngModel artifact schema error (%s): %s", path, exc)
+            return LoadFailed(reason="parse_error")
+
+        return Loaded(model=model)
