@@ -13,10 +13,14 @@ import io
 import logging
 import math
 import subprocess
+from dataclasses import dataclass
+from typing import Literal
 
 from PIL import Image
 
 from config import settings
+from estimation.models import Loaded, LoadFailed, load_png_model
+from estimation.png_features import extract_png_features
 from optimizers.png import LARGE_MP_THRESHOLD
 from optimizers.router import optimize_image
 from optimizers.utils import clamp_quality
@@ -24,6 +28,164 @@ from schemas import EstimateResponse, OptimizationConfig
 from utils.format_detect import ImageFormat, detect_format
 
 logger = logging.getLogger("pare.estimation")
+
+
+# ---------------------------------------------------------------------------
+# Fitted-BPP result union  (consensus #1 — result union, not exception)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class FittedBpp:
+    """Fitted model predicted a BPP value successfully."""
+
+    bpp: float
+
+
+@dataclass(frozen=True, slots=True)
+class FittedFallback:
+    """Fitted model could not predict; caller should fall back to sample path."""
+
+    reason: Literal[
+        "mode_unsupported_or_oob",
+        "model_load_failed",
+        "prediction_oob",
+        "prediction_disagreement",
+        "internal_error",
+    ]
+
+
+def _resolve_estimate_strategy(fmt: ImageFormat) -> str:
+    """Return 'fitted' or 'sample'.
+
+    Reads ``settings.fitted_estimator_mode`` at call time so that
+    ``monkeypatch.setattr("estimation.estimator.settings.fitted_estimator_mode", ...)``
+    in tests takes effect without reloading the module (consensus #10).
+    """
+    if fmt == ImageFormat.PNG and settings.fitted_estimator_mode == "active":
+        return "fitted"
+    return "sample"
+
+
+def _png_fitted_bpp(
+    img: "Image.Image",
+    orig_w: int,
+    orig_h: int,
+    quality: int,
+    orig_size: int = 0,
+) -> FittedBpp | FittedFallback:
+    """Apply the fitted PNG BPP model to *img*.
+
+    Synchronous because feature extraction (PIL resize + scipy Sobel) is CPU-bound;
+    callers in async context wrap this in ``asyncio.to_thread()`` per the project's
+    async discipline (see ``CLAUDE.md``).
+
+    Steps
+    -----
+    1. Extract features (returns None on unsupported mode or OOB pixel count).
+    2. Load the PNG model (lru-cached; never raises).
+    3. Standardise features.
+    4. Apply piecewise-linear knot columns (log10_unique_colors, q50, q70).
+    5. Compute predicted BPP via dot-product.
+    6. Sanity-check the prediction (basic OOB + content-aware ratio gate).
+    """
+    try:
+        return _png_fitted_bpp_inner(img, orig_w, orig_h, quality, orig_size)
+    except Exception as exc:
+        logger.warning("png fitted estimator internal error: %s", exc, exc_info=True)
+        return FittedFallback(reason="internal_error")
+
+
+def _png_fitted_bpp_inner(
+    img: "Image.Image",
+    orig_w: int,
+    orig_h: int,
+    quality: int,
+    orig_size: int = 0,
+) -> FittedBpp | FittedFallback:
+    """Inner implementation — called by ``_png_fitted_bpp`` which wraps in try/except."""
+    import math
+
+    import numpy as np
+
+    # 1. Feature extraction (pass orig_size for input_bpp)
+    features = extract_png_features(img, orig_w, orig_h, quality, orig_size)
+    if features is None:
+        return FittedFallback(reason="mode_unsupported_or_oob")
+
+    # 2. Load model
+    match load_png_model():
+        case Loaded(model=model):
+            pass
+        case LoadFailed():
+            return FittedFallback(reason="model_load_failed")
+
+    # 3. Build feature vector in model's declared order
+    feature_values: dict[str, float] = {
+        "has_alpha": float(features.has_alpha),
+        "log10_unique_colors": features.log10_unique_colors,
+        "mean_sobel": features.mean_sobel,
+        "edge_density": features.edge_density,
+        "quality": float(features.quality),
+        "log10_orig_pixels": features.log10_orig_pixels,
+        "input_bpp": features.input_bpp,
+    }
+    x_raw = np.array([feature_values[name] for name in model.features], dtype=np.float64)
+
+    # 4. Standardise
+    mean_ = np.array(model.scaler["mean"], dtype=np.float64)
+    scale_ = np.array(model.scaler["scale"], dtype=np.float64)
+    x_scaled = (x_raw - mean_) / scale_
+
+    # 5. Piecewise-linear knots (raw feature values, not standardised)
+    try:
+        knot_lc_idx = model.features.index("log10_unique_colors")
+        quality_idx = model.features.index("quality")
+    except ValueError:
+        return FittedFallback(reason="model_load_failed")
+
+    log10_uc = x_raw[knot_lc_idx]
+    knot_lc_val = max(0.0, log10_uc - model.knot_log10_unique_colors)
+
+    quality_raw = x_raw[quality_idx]
+    knot_q50_val = max(0.0, quality_raw - model.knot_q50)
+    knot_q70_val = max(0.0, quality_raw - model.knot_q70)
+
+    # 6. Predict: intercept + betas @ x_scaled + knot contributions
+    betas = np.array(model.coefficients["betas"], dtype=np.float64)
+    predicted_bpp = (
+        model.coefficients["intercept"]
+        + float(betas @ x_scaled)
+        + model.coefficients["knot_beta"] * knot_lc_val
+        + model.coefficients["knot_q50_beta"] * knot_q50_val
+        + model.coefficients["knot_q70_beta"] * knot_q70_val
+    )
+
+    # 7. Post-prediction sanity — basic finite/range check
+    if not math.isfinite(predicted_bpp) or predicted_bpp < 0.001 or predicted_bpp > 32.0:
+        return FittedFallback(reason="prediction_oob")
+
+    # 8. Content-aware ratio gate: output_bpp / input_bpp must be plausible.
+    # Only applies when input_bpp is known (orig_size > 0).
+    if features.input_bpp > 0.0:
+        # Maximum plausible compression ratio by quality regime:
+        # q < 50: pngquant caps max_colors=64, 20× max reduction → min ratio 0.05
+        # 50 <= q < 70: max_colors=256, 10× max reduction → min ratio 0.10
+        # q >= 70: lossless only, 2.5× max reduction → min ratio 0.40
+        if quality < 50:
+            min_ratio = 0.05
+        elif quality < 70:
+            min_ratio = 0.10
+        else:
+            min_ratio = 0.40
+        max_ratio = 1.10  # output should not exceed input by more than 10%
+
+        ratio = predicted_bpp / features.input_bpp
+        if ratio < min_ratio or ratio > max_ratio:
+            return FittedFallback(reason="prediction_disagreement")
+
+    return FittedBpp(bpp=predicted_bpp)
+
 
 # Register optional Pillow format plugins so Image.open() can identify all formats.
 # These are imported lazily by the optimizers; the estimator needs them registered
@@ -237,6 +399,53 @@ async def _estimate_by_sample(
     sample_height = max(1, int(height * ratio))
     sample_pixels = sample_width * sample_height
 
+    # --- Fitted estimator path (PNG only, mode=active) ---
+    strategy = _resolve_estimate_strategy(fmt)
+    if strategy == "fitted" and fmt == ImageFormat.PNG:
+        fitted_result = await asyncio.to_thread(
+            _png_fitted_bpp, img, width, height, config.quality, file_size
+        )
+        match fitted_result:
+            case FittedBpp(bpp=bpp):
+                estimated_size = min(int(bpp * original_pixels / 8), file_size)
+                reduction = max(0.0, round((file_size - estimated_size) / file_size * 100, 1))
+                return _build_estimate(
+                    file_size,
+                    fmt,
+                    width,
+                    height,
+                    color_type,
+                    bit_depth,
+                    estimated_size,
+                    reduction,
+                    "png_fitted_curve",
+                    confidence="medium",
+                    path="png_fitted_curve",
+                    fallback_reason=None,
+                )
+            case FittedFallback(reason=reason):
+                logger.info(
+                    "png fitted estimator fell back: %s — using direct_encode_sample", reason
+                )
+                # Fall through to direct_encode_sample with fallback_reason populated
+                bpp_fn = _DIRECT_ENCODE_BPP_FNS.get(fmt)
+                if bpp_fn is not None:
+                    return await _bpp_to_estimate(
+                        bpp_fn,
+                        img,
+                        sample_width,
+                        sample_height,
+                        config,
+                        original_pixels,
+                        file_size,
+                        fmt,
+                        width,
+                        height,
+                        color_type,
+                        bit_depth,
+                        fallback_reason=reason,
+                    )
+
     bpp_fn = _DIRECT_ENCODE_BPP_FNS.get(fmt)
     if bpp_fn is not None:
         return await _bpp_to_estimate(
@@ -313,6 +522,7 @@ async def _bpp_to_estimate(
     height: int,
     color_type: str | None,
     bit_depth: int | None,
+    fallback_reason: str | None = None,
 ) -> EstimateResponse:
     """Encode a sample with bpp_fn and extrapolate BPP to full image size."""
     # PNG sample BPP needs original dimensions to mirror the optimizer's dimension-aware
@@ -372,6 +582,7 @@ async def _bpp_to_estimate(
         reduction,
         method,
         path="direct_encode_sample",
+        fallback_reason=fallback_reason,
     )
 
 
@@ -774,6 +985,7 @@ def _build_estimate(
     method: str,
     confidence: str = "high",
     path: str | None = None,
+    fallback_reason: str | None = None,
 ) -> EstimateResponse:
     """Build an EstimateResponse with standard field derivations."""
     return EstimateResponse(
@@ -789,6 +1001,7 @@ def _build_estimate(
         already_optimized=reduction == 0,
         confidence=confidence,
         path=path,
+        fallback_reason=fallback_reason,
     )
 
 

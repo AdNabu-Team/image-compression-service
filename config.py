@@ -1,4 +1,5 @@
 import os
+from typing import Literal
 
 from PIL import Image
 from pydantic_settings import BaseSettings
@@ -46,6 +47,13 @@ class Settings(BaseSettings):
 
     # --- Format Support ---
     enable_jxl: bool = False  # Requires libjxl build (cjxl, djxl, jpegli, jxlpy)
+
+    # --- Fitted Estimator ---
+    # "off": existing direct-encode-sample path unchanged (default, safe rollout gate).
+    # "active": fitted BPP curve runs instead of direct-encode-sample for supported formats.
+    # Env-var rollout only — do not flip in application code; use env FITTED_ESTIMATOR_MODE=active.
+    # Production flips require the staged rollout playbook.
+    fitted_estimator_mode: Literal["off", "active"] = "off"
 
     # --- Logging ---
     log_level: str = "ERROR"
