@@ -55,6 +55,20 @@ class Settings(BaseSettings):
     # Production flips require the staged rollout playbook.
     fitted_estimator_mode: Literal["off", "active"] = "off"
 
+    # --- Range-Fetch / Header-Only Estimation ---
+    header_only_min_size_bytes: int = 1_048_576  # 1 MB
+    """Minimum file size for the header-only Range-fetch path. Smaller files round-trip
+    the Range request in similar time to a full small download, so we just download.
+    Used by routers/estimate.py URL-mode dispatch."""
+
+    large_file_threshold_bytes: int = (
+        10 * 1024 * 1024
+    )  # 10 MB (unchanged from prior hardcoded value)
+    """Threshold above which the legacy thumbnail_url fast path activates.
+    Configurable now (was hardcoded 10MB constant). Default preserves prior behavior.
+    The new header-only path uses its own threshold (header_only_min_size_bytes,
+    default 1 MB) independent of this."""
+
     # --- Logging ---
     log_level: str = "ERROR"
 
