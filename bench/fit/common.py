@@ -62,9 +62,9 @@ def train_one(
 
     n, p = X_raw.shape
     assert n == len(y), f"Row count mismatch: X has {n} rows, y has {len(y)}"
-    assert p == len(feature_names), (
-        f"Column count mismatch: X has {p} columns, feature_names has {len(feature_names)}"
-    )
+    assert p == len(
+        feature_names
+    ), f"Column count mismatch: X has {p} columns, feature_names has {len(feature_names)}"
 
     # --- StandardScaler ---
     mean_ = X_raw.mean(axis=0)
@@ -91,8 +91,7 @@ def train_one(
         quality_col_idx = feature_names.index("quality")
     except ValueError as exc:
         raise ValueError(
-            f"feature_names must contain 'quality' for quality knot terms; "
-            f"got: {feature_names}"
+            f"feature_names must contain 'quality' for quality knot terms; " f"got: {feature_names}"
         ) from exc
 
     quality_raw = X_raw[:, quality_col_idx]

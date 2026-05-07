@@ -377,8 +377,8 @@ async def test_png_fitted_internal_error_falls_back(
     # Should fall back to direct_encode_sample with internal_error reason
     assert result.path in ("direct_encode_sample", "exact"), f"Unexpected path {result.path!r}"
     if result.path == "direct_encode_sample":
-        assert result.fallback_reason == "internal_error", (
-            f"Expected fallback_reason='internal_error', got {result.fallback_reason!r}"
-        )
+        assert (
+            result.fallback_reason == "internal_error"
+        ), f"Expected fallback_reason='internal_error', got {result.fallback_reason!r}"
 
     models_mod.load_png_model.cache_clear()

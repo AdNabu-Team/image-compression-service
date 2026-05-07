@@ -1,7 +1,8 @@
 """Tests for Settings / config.py behaviour."""
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 
 def test_compression_semaphore_floor_on_single_cpu():
@@ -19,6 +20,7 @@ def test_compression_semaphore_floor_on_single_cpu():
 def test_fitted_estimator_mode_rejects_invalid_value():
     """fitted_estimator_mode must reject values other than 'off' or 'active' at boot."""
     from pydantic import ValidationError
+
     from config import Settings
 
     with pytest.raises(ValidationError, match="Input should be 'off' or 'active'"):

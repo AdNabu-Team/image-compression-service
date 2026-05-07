@@ -293,15 +293,12 @@ def main() -> int:
     ]
 
     # Build numpy arrays from list-of-dicts (no pandas)
-    X = np.asarray(
-        [[r[col] for col in feature_row_keys] for r in rows], dtype=np.float64
-    )
+    X = np.asarray([[r[col] for col in feature_row_keys] for r in rows], dtype=np.float64)
     targets = np.asarray([r["actual_bpp"] for r in rows], dtype=np.float64)
 
     # Rename rows to use model feature names (for training_envelope)
     renamed_rows = [
-        {fname: r[rkey] for fname, rkey in zip(feature_names, feature_row_keys)}
-        for r in rows
+        {fname: r[rkey] for fname, rkey in zip(feature_names, feature_row_keys)} for r in rows
     ]
 
     # Fit (three knots: log10_unique_colors at 3.3, quality at 50 and 70)
