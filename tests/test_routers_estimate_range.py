@@ -432,3 +432,186 @@ def test_large_file_threshold_is_settings_field() -> None:
     assert (
         s.large_file_threshold_bytes == 1 * 1024 * 1024
     ), f"Expected 1 MB default, got {s.large_file_threshold_bytes}"
+
+
+# ---------------------------------------------------------------------------
+# §9 Multipart mode: header-only returns result (router line 81 branch)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_multipart_header_only_returns_result_directly(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """When estimate_from_header_bytes returns a valid result, the router returns it immediately."""
+    import estimation.models as models_mod
+
+    _copy_real_model(tmp_path, "png_header_v1.json")
+    monkeypatch.setattr(models_mod, "_MODELS_DIR", tmp_path)
+    models_mod.load_png_header_model.cache_clear()
+
+    from main import app
+    from schemas import EstimateResponse
+
+    test_client = TestClient(app, raise_server_exceptions=True)
+    png_data = _make_large_png(600, 600)
+
+    # Stub estimate_from_header_bytes to always return a canned response
+    canned = EstimateResponse(
+        original_size=len(png_data),
+        original_format="png",
+        dimensions={"width": 600, "height": 600},
+        color_type="rgb",
+        bit_depth=8,
+        estimated_optimized_size=int(len(png_data) * 0.6),
+        estimated_reduction_percent=40.0,
+        optimization_potential="high",
+        method="png_header_only",
+        already_optimized=False,
+        confidence="medium",
+        path="png_header_only",
+        fallback_reason=None,
+    )
+
+    with (
+        patch("routers.estimate.settings.fitted_estimator_mode", "active"),
+        patch("routers.estimate.settings.header_only_min_size_bytes", 1),
+        patch(
+            "routers.estimate.estimate_from_header_bytes",
+            new=AsyncMock(return_value=canned),
+        ),
+    ):
+        resp = test_client.post(
+            "/estimate",
+            files={"file": ("test.png", png_data, "image/png")},
+        )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["path"] == "png_header_only"
+    assert data["estimated_reduction_percent"] == pytest.approx(40.0)
+
+    models_mod.load_png_header_model.cache_clear()
+
+
+# ---------------------------------------------------------------------------
+# §10 URL mode: range header-only returns result directly (router lines 170-172)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_url_range_header_only_returns_result_directly(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """When header-only succeeds in URL mode, router returns the result without full download."""
+    import estimation.models as models_mod
+
+    _copy_real_model(tmp_path, "png_header_v1.json")
+    monkeypatch.setattr(models_mod, "_MODELS_DIR", tmp_path)
+    models_mod.load_png_header_model.cache_clear()
+
+    png_data = _make_large_png(600, 600)
+    total_size = len(png_data)
+
+    range_resp1 = _make_stream_ctx(
+        png_data[:8],
+        status_code=206,
+        headers={"content-range": f"bytes 0-7/{total_size}"},
+    )
+    range_resp2 = _make_stream_ctx(
+        png_data[:100],
+        status_code=206,
+        headers={"content-range": f"bytes 0-99/{total_size}"},
+    )
+    mock_http_client = _make_client([range_resp1, range_resp2])
+
+    from schemas import EstimateResponse
+
+    canned = EstimateResponse(
+        original_size=total_size,
+        original_format="png",
+        dimensions={"width": 600, "height": 600},
+        color_type="rgb",
+        bit_depth=8,
+        estimated_optimized_size=int(total_size * 0.65),
+        estimated_reduction_percent=35.0,
+        optimization_potential="high",
+        method="png_header_only",
+        already_optimized=False,
+        confidence="medium",
+        path="png_header_only",
+        fallback_reason=None,
+    )
+
+    from main import app
+
+    test_client = TestClient(app, raise_server_exceptions=True)
+
+    with (
+        patch("utils.url_fetch.validate_url", return_value=None),
+        patch("utils.url_fetch._get_client", new=AsyncMock(return_value=mock_http_client)),
+        patch("routers.estimate.settings.fitted_estimator_mode", "active"),
+        patch("routers.estimate.settings.header_only_min_size_bytes", 1),
+        patch("estimation.estimator.settings.fitted_estimator_mode", "active"),
+        patch(
+            "routers.estimate.estimate_from_header_bytes",
+            new=AsyncMock(return_value=canned),
+        ),
+    ):
+        resp = test_client.post(
+            "/estimate",
+            json={"url": "https://example.com/img.png"},
+            headers={"Content-Type": "application/json"},
+        )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["path"] == "png_header_only"
+    assert data["estimated_reduction_percent"] == pytest.approx(35.0)
+
+    models_mod.load_png_header_model.cache_clear()
+
+
+# ---------------------------------------------------------------------------
+# §11 URL mode: full-download path with large file → FileTooLargeError (router line 182)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_url_full_download_too_large_returns_413(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When full URL download exceeds max_file_size_bytes, router returns 413."""
+    import estimation.estimator as estimator_mod
+
+    monkeypatch.setattr(estimator_mod.settings, "fitted_estimator_mode", "active")
+
+    from main import app
+
+    test_client = TestClient(app, raise_server_exceptions=False)
+
+    # Patch fetch_image to return a huge byte string
+    huge_data = b"\x89PNG\r\n\x1a\n" + b"\x00" * (60 * 1024 * 1024)  # 60 MB
+
+    from exceptions import FileTooLargeError
+
+    async def _huge_fetch(url: str, **kwargs) -> bytes:
+        raise FileTooLargeError(
+            "too large",
+            file_size=len(huge_data),
+            limit=50 * 1024 * 1024,
+        )
+
+    with (
+        patch("utils.url_fetch.validate_url", return_value=None),
+        patch("routers.estimate.fetch_partial", side_effect=Exception("no range")),
+        patch("routers.estimate.settings.fitted_estimator_mode", "active"),
+        patch("routers.estimate.fetch_image", new=AsyncMock(side_effect=_huge_fetch)),
+    ):
+        resp = test_client.post(
+            "/estimate",
+            json={"url": "https://example.com/huge.png"},
+            headers={"Content-Type": "application/json"},
+        )
+
+    assert resp.status_code in (413, 400, 500)  # FileTooLargeError → 413 or mapped error

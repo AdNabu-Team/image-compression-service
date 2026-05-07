@@ -907,3 +907,81 @@ class TestLoadJpegHeaderModel:
         result = load_jpeg_header_model()
         assert isinstance(result, LoadFailed)
         assert result.reason == "version_mismatch"
+
+
+# ---------------------------------------------------------------------------
+# Defensive "other" exception handlers in the three loaders
+# ---------------------------------------------------------------------------
+
+
+class TestLoaderDefensiveExceptionHandler:
+    """Cover the except Exception: → LoadFailed('other') path in each loader.
+
+    These handlers exist as belt-and-suspenders: ``from_json`` is designed
+    never to raise, but the loaders guard against future bugs.  We force a
+    raise by patching ``from_json`` directly.
+    """
+
+    def test_load_png_model_defensive_exception(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """If PngModel.from_json raises unexpectedly, loader returns LoadFailed('other')."""
+        import estimation.models as models_mod
+        from estimation.models._artifact import PngModel
+
+        monkeypatch.setattr(models_mod, "_MODELS_DIR", tmp_path)
+        load_png_model.cache_clear()
+
+        # Monkeypatch from_json to raise (circumvents the "never raises" contract)
+        def _explode(path):
+            raise RuntimeError("unexpected failure")
+
+        monkeypatch.setattr(PngModel, "from_json", staticmethod(_explode))
+
+        result = load_png_model()
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "other"
+
+        load_png_model.cache_clear()
+
+    def test_load_png_header_model_defensive_exception(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """If PngHeaderModel.from_json raises unexpectedly, loader returns LoadFailed('other')."""
+        import estimation.models as models_mod
+        from estimation.models._artifact import PngHeaderModel
+
+        monkeypatch.setattr(models_mod, "_MODELS_DIR", tmp_path)
+        load_png_header_model.cache_clear()
+
+        def _explode(path):
+            raise RuntimeError("unexpected failure")
+
+        monkeypatch.setattr(PngHeaderModel, "from_json", staticmethod(_explode))
+
+        result = load_png_header_model()
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "other"
+
+        load_png_header_model.cache_clear()
+
+    def test_load_jpeg_header_model_defensive_exception(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """If JpegHeaderModel.from_json raises unexpectedly, loader returns LoadFailed('other')."""
+        import estimation.models as models_mod
+        from estimation.models._artifact import JpegHeaderModel
+
+        monkeypatch.setattr(models_mod, "_MODELS_DIR", tmp_path)
+        load_jpeg_header_model.cache_clear()
+
+        def _explode(path):
+            raise RuntimeError("unexpected failure")
+
+        monkeypatch.setattr(JpegHeaderModel, "from_json", staticmethod(_explode))
+
+        result = load_jpeg_header_model()
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "other"
+
+        load_jpeg_header_model.cache_clear()

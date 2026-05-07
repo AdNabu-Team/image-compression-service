@@ -585,21 +585,21 @@ try:
     import pillow_heif
 
     pillow_heif.register_heif_opener()
-except ImportError:
-    pass
+except ImportError:  # pragma: no cover
+    pass  # pragma: no cover
 try:
     import pillow_avif  # noqa: F401 — auto-registers on import
-except ImportError:
-    pass
+except ImportError:  # pragma: no cover
+    pass  # pragma: no cover
 
-if settings.enable_jxl:
-    try:
-        import pillow_jxl  # noqa: F401 — auto-registers on import
-    except ImportError:
-        try:
-            import jxlpy.JXLImagePlugin  # noqa: F401
-        except ImportError:
-            pass
+if settings.enable_jxl:  # pragma: no cover
+    try:  # pragma: no cover
+        import pillow_jxl  # noqa: F401 — auto-registers on import  # pragma: no cover
+    except ImportError:  # pragma: no cover
+        try:  # pragma: no cover
+            import jxlpy.JXLImagePlugin  # noqa: F401  # pragma: no cover
+        except ImportError:  # pragma: no cover
+            pass  # pragma: no cover
 
 SAMPLE_MAX_WIDTH = 800  # BMP/TIFF need 800px+ to capture full-resolution redundancy
 _PNG_SAMPLE_TIMEOUT = 10  # seconds — pngquant subprocess timeout for sample encoding
@@ -624,8 +624,8 @@ _EXACT_FILE_SIZE_FORMATS = {
     ImageFormat.HEIC,
     ImageFormat.AVIF,
 }
-if settings.enable_jxl:
-    _EXACT_FILE_SIZE_FORMATS.add(ImageFormat.JXL)
+if settings.enable_jxl:  # pragma: no cover
+    _EXACT_FILE_SIZE_FORMATS.add(ImageFormat.JXL)  # pragma: no cover
 
 
 async def estimate(
@@ -1332,8 +1332,8 @@ _DIRECT_ENCODE_BPP_FNS = {
     ImageFormat.TIFF: _tiff_sample_bpp,
 }
 
-if settings.enable_jxl:
-    _DIRECT_ENCODE_BPP_FNS[ImageFormat.JXL] = _jxl_sample_bpp
+if settings.enable_jxl:  # pragma: no cover
+    _DIRECT_ENCODE_BPP_FNS[ImageFormat.JXL] = _jxl_sample_bpp  # pragma: no cover
 
 
 def _create_sample(

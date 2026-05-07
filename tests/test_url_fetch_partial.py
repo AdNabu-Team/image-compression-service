@@ -345,3 +345,188 @@ async def test_fetch_partial_ssrf_blocked():
 
     with pytest.raises(SSRFError):
         await fetch_partial("https://127.0.0.1/img.png", byte_range=(0, 8191))
+
+
+# ---------------------------------------------------------------------------
+# Redirect without Location header → URLFetchError
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_fetch_partial_redirect_no_next_request_raises():
+    """Redirect response with no next_request (no Location header) raises URLFetchError."""
+    from utils.url_fetch import fetch_partial
+
+    redirect_resp = MagicMock()
+    redirect_resp.status_code = 301
+    redirect_resp.is_redirect = True
+    redirect_resp.next_request = None  # no Location header
+
+    mock_client = _make_partial_stream_client([redirect_resp])
+
+    with patch("utils.url_fetch.validate_url", return_value=None):
+        with patch("utils.url_fetch._get_client", new=AsyncMock(return_value=mock_client)):
+            with pytest.raises(URLFetchError, match="Redirect without Location header"):
+                await fetch_partial("https://example.com/img.png", byte_range=(0, 99))
+
+
+# ---------------------------------------------------------------------------
+# Too many redirects → URLFetchError
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_fetch_partial_too_many_redirects_raises():
+    """Redirect loop exhausted → URLFetchError('Too many redirects')."""
+    from utils.url_fetch import fetch_partial
+
+    # Build max_redirects + 1 redirect responses, all pointing elsewhere
+    def _make_redirect(target: str) -> MagicMock:
+        r = MagicMock()
+        r.status_code = 301
+        r.is_redirect = True
+        r.next_request = MagicMock()
+        r.next_request.url = target
+        return r
+
+    # 6 redirects (default max is 5, so this exhausts the loop)
+    redirects = [_make_redirect(f"https://cdn{i}.example.com/img.png") for i in range(6)]
+    mock_client = _make_partial_stream_client(redirects)
+
+    with patch("utils.url_fetch.validate_url", return_value=None):
+        with patch("utils.url_fetch._get_client", new=AsyncMock(return_value=mock_client)):
+            with pytest.raises(URLFetchError, match="Too many redirects"):
+                await fetch_partial("https://example.com/img.png", byte_range=(0, 99))
+
+
+# ---------------------------------------------------------------------------
+# 206 with malformed Content-Range header → total_size=None (no crash)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_fetch_partial_206_malformed_content_range():
+    """206 with non-parseable Content-Range → total_size=None (ValueError branch)."""
+    from utils.url_fetch import fetch_partial
+
+    body = b"A" * 50
+    resp = _make_response(
+        206,
+        body,
+        headers={"content-range": "bytes 0-49/notanumber"},
+    )
+    mock_client = _make_partial_stream_client([resp])
+
+    with patch("utils.url_fetch.validate_url", return_value=None):
+        with patch("utils.url_fetch._get_client", new=AsyncMock(return_value=mock_client)):
+            data, total = await fetch_partial("https://example.com/img.png", byte_range=(0, 49))
+
+    assert total is None
+    assert len(data) == 50
+
+
+# ---------------------------------------------------------------------------
+# 206 — reader loop hits remaining <= 0 guard before last chunk
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_fetch_partial_206_remaining_zero_guard():
+    """206 reader: when buf fills exactly, remaining<=0 guard fires on next iteration."""
+    from utils.url_fetch import fetch_partial
+
+    # Simulate server streaming 3 chunks: first fills the buffer exactly, then more
+    chunk1 = b"X" * 10
+    chunk2 = b"Y" * 10  # this chunk would overflow; guard must prevent it
+
+    async def _aiter_multi():
+        yield chunk1
+        yield chunk2
+
+    resp = MagicMock()
+    resp.status_code = 206
+    resp.is_redirect = False
+    resp.headers = {"content-range": "bytes 0-9/100"}
+    resp.aiter_bytes = _aiter_multi
+
+    def _stream_ctx(*args, **kwargs):
+        ctx = AsyncMock()
+        ctx.__aenter__ = AsyncMock(return_value=resp)
+        ctx.__aexit__ = AsyncMock(return_value=None)
+        return ctx
+
+    mock_client = MagicMock()
+    mock_client.stream = _stream_ctx
+
+    with patch("utils.url_fetch.validate_url", return_value=None):
+        with patch("utils.url_fetch._get_client", new=AsyncMock(return_value=mock_client)):
+            data, total = await fetch_partial("https://example.com/img.png", byte_range=(0, 9))
+
+    # Must be capped at max_bytes = 10
+    assert len(data) <= 10
+    assert total == 100
+
+
+# ---------------------------------------------------------------------------
+# 200 with malformed Content-Length → total_size=None (ValueError branch)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_fetch_partial_200_malformed_content_length():
+    """200 with non-integer Content-Length → total_size=None (ValueError branch)."""
+    from utils.url_fetch import fetch_partial
+
+    body = b"Q" * 50
+    resp = _make_response(
+        200,
+        body,
+        headers={"content-length": "notanumber"},
+    )
+    mock_client = _make_partial_stream_client([resp])
+
+    with patch("utils.url_fetch.validate_url", return_value=None):
+        with patch("utils.url_fetch._get_client", new=AsyncMock(return_value=mock_client)):
+            data, total = await fetch_partial("https://example.com/img.png", byte_range=(0, 99))
+
+    assert total is None
+    assert len(data) <= 100
+
+
+# ---------------------------------------------------------------------------
+# 200 — reader loop hits remaining <= 0 guard before last chunk
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_fetch_partial_200_remaining_zero_guard():
+    """200 reader: when buf fills exactly, remaining<=0 guard fires on next chunk."""
+    from utils.url_fetch import fetch_partial
+
+    chunk1 = b"Z" * 10
+    chunk2 = b"W" * 10  # overflow chunk — guard must prevent read
+
+    async def _aiter_multi():
+        yield chunk1
+        yield chunk2
+
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.is_redirect = False
+    resp.headers = {}
+    resp.aiter_bytes = _aiter_multi
+
+    def _stream_ctx(*args, **kwargs):
+        ctx = AsyncMock()
+        ctx.__aenter__ = AsyncMock(return_value=resp)
+        ctx.__aexit__ = AsyncMock(return_value=None)
+        return ctx
+
+    mock_client = MagicMock()
+    mock_client.stream = _stream_ctx
+
+    with patch("utils.url_fetch.validate_url", return_value=None):
+        with patch("utils.url_fetch._get_client", new=AsyncMock(return_value=mock_client)):
+            data, total = await fetch_partial("https://example.com/img.png", byte_range=(0, 9))
+
+    assert len(data) <= 10
