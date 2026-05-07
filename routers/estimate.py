@@ -60,8 +60,8 @@ async def estimate(
                 limit=settings.max_file_size_bytes,
             )
 
-        # Validate format
-        detect_format(data)
+        # Validate format (raises UnsupportedFormatError if format is not recognized)
+        fmt_detected = detect_format(data)
 
         # Validate decompressed size (reject images that would use too much memory)
         validate_image_dimensions(data)
@@ -69,7 +69,6 @@ async def estimate(
         # Multipart header-only short-circuit: skip Pillow _open_image decode for
         # large PNG/JPEG when the fitted estimator is active.
         if settings.fitted_estimator_mode == "active":
-            fmt_detected = detect_format(data)
             if (
                 fmt_detected in (ImageFormat.PNG, ImageFormat.JPEG)
                 and len(data) >= settings.header_only_min_size_bytes
@@ -149,6 +148,14 @@ async def estimate(
                 # Fall through to full download
                 fmt_detected = None
                 total_size = None
+
+            # Enforce max_file_size_bytes from the Range-fetch total before any full download
+            if total_size is not None and total_size > settings.max_file_size_bytes:
+                raise FileTooLargeError(
+                    f"URL content too large: {total_size} bytes",
+                    file_size=total_size,
+                    limit=settings.max_file_size_bytes,
+                )
 
             if (
                 fmt_detected in (ImageFormat.PNG, ImageFormat.JPEG)

@@ -425,13 +425,13 @@ def test_multipart_mode_small_files_unchanged(client) -> None:
 
 
 def test_large_file_threshold_is_settings_field() -> None:
-    """large_file_threshold_bytes defaults to 1 MB (was 10 MB hardcoded)."""
+    """large_file_threshold_bytes defaults to 10 MB (preserves prior hardcoded value)."""
     from config import Settings
 
     s = Settings()
     assert (
-        s.large_file_threshold_bytes == 1 * 1024 * 1024
-    ), f"Expected 1 MB default, got {s.large_file_threshold_bytes}"
+        s.large_file_threshold_bytes == 10 * 1024 * 1024
+    ), f"Expected 10 MB default, got {s.large_file_threshold_bytes}"
 
 
 # ---------------------------------------------------------------------------
