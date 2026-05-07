@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -99,6 +100,88 @@ class PngModel:
     created_at: str
 
     @classmethod
+    def _validate_schema(cls, raw: dict[str, Any], features: list[str]) -> str | None:
+        """Validate scaler/coefficients shapes and numeric bounds.
+
+        Returns ``None`` on success, or a human-readable reason string on failure.
+        Logs the reason at DEBUG level so test failures are debuggable.
+        """
+        # --- scaler shape ---
+        scaler = raw.get("scaler")
+        if not isinstance(scaler, dict) or "mean" not in scaler or "scale" not in scaler:
+            reason = "scaler must be a dict with keys 'mean' and 'scale'"
+            logger.debug("PngModel schema validation failed: %s", reason)
+            return reason
+        if not isinstance(scaler["mean"], list) or not isinstance(scaler["scale"], list):
+            reason = "scaler['mean'] and scaler['scale'] must be lists"
+            logger.debug("PngModel schema validation failed: %s", reason)
+            return reason
+        if len(scaler["mean"]) != len(features) or len(scaler["scale"]) != len(features):
+            reason = (
+                f"scaler mean/scale length {len(scaler['mean'])}/{len(scaler['scale'])} "
+                f"!= features length {len(features)}"
+            )
+            logger.debug("PngModel schema validation failed: %s", reason)
+            return reason
+        for val in scaler["mean"] + scaler["scale"]:
+            if not isinstance(val, (int, float)) or not math.isfinite(float(val)):
+                reason = f"non-finite value in scaler: {val!r}"
+                logger.debug("PngModel schema validation failed: %s", reason)
+                return reason
+
+        # --- coefficients shape ---
+        coefficients = raw.get("coefficients")
+        if not isinstance(coefficients, dict):
+            reason = "coefficients must be a dict"
+            logger.debug("PngModel schema validation failed: %s", reason)
+            return reason
+        if "betas" not in coefficients:
+            reason = "coefficients must have key 'betas'"
+            logger.debug("PngModel schema validation failed: %s", reason)
+            return reason
+        if "intercept" not in coefficients:
+            reason = "coefficients must have key 'intercept'"
+            logger.debug("PngModel schema validation failed: %s", reason)
+            return reason
+
+        betas = coefficients["betas"]
+        intercept = coefficients["intercept"]
+        if not isinstance(betas, list):
+            reason = "coefficients['betas'] must be a list"
+            logger.debug("PngModel schema validation failed: %s", reason)
+            return reason
+        # betas has one entry per feature; knot terms are stored separately
+        expected_betas_len = len(features)
+        if len(betas) != expected_betas_len:
+            reason = (
+                f"coefficients['betas'] length {len(betas)} != "
+                f"len(features) = {expected_betas_len}"
+            )
+            logger.debug("PngModel schema validation failed: %s", reason)
+            return reason
+        if not isinstance(intercept, (int, float)) or not math.isfinite(float(intercept)):
+            reason = f"coefficients['intercept'] is not finite: {intercept!r}"
+            logger.debug("PngModel schema validation failed: %s", reason)
+            return reason
+
+        # --- numeric bounds (security: prevent adversarial artifacts) ---
+        if abs(float(intercept)) > 1000.0:
+            reason = f"intercept {intercept} exceeds ±1000 bound"
+            logger.debug("PngModel schema validation failed: %s", reason)
+            return reason
+        for i, b in enumerate(betas):
+            if not isinstance(b, (int, float)) or not math.isfinite(float(b)):
+                reason = f"non-finite beta[{i}]: {b!r}"
+                logger.debug("PngModel schema validation failed: %s", reason)
+                return reason
+            if abs(float(b)) > 100.0:
+                reason = f"beta[{i}] = {b} exceeds ±100 bound"
+                logger.debug("PngModel schema validation failed: %s", reason)
+                return reason
+
+        return None
+
+    @classmethod
     def from_json(cls, path: Path) -> Loaded | LoadFailed:
         """Load and validate a ``PngModel`` from a JSON file at *path*.
 
@@ -106,7 +189,7 @@ class PngModel:
 
         - ``path`` does not exist → ``"missing"``
         - JSON parse error or schema mismatch → ``"parse_error"``
-        - ``model_version != 1`` → ``"version_mismatch"``
+        - ``model_version != _SUPPORTED_MODEL_VERSION`` (currently 2) → ``"version_mismatch"``
         - Any other unexpected exception → ``"other"``
 
         Never raises.
@@ -155,6 +238,12 @@ class PngModel:
             )
         except (KeyError, TypeError, ValueError) as exc:
             logger.warning("PngModel artifact schema error (%s): %s", path, exc)
+            return LoadFailed(reason="parse_error")
+
+        # Validate scaler/coefficients shapes and numeric bounds after construction
+        validation_error = cls._validate_schema(raw, model.features)
+        if validation_error is not None:
+            logger.warning("PngModel artifact validation failed (%s): %s", path, validation_error)
             return LoadFailed(reason="parse_error")
 
         return Loaded(model=model)

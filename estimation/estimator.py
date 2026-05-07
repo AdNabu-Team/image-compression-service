@@ -51,6 +51,7 @@ class FittedFallback:
         "model_load_failed",
         "prediction_oob",
         "prediction_disagreement",
+        "internal_error",
     ]
 
 
@@ -75,10 +76,9 @@ def _png_fitted_bpp(
 ) -> FittedBpp | FittedFallback:
     """Apply the fitted PNG BPP model to *img*.
 
-    Synchronous — callers in async context must wrap in ``asyncio.to_thread()``
-    only if this is called alongside other heavy CPU work.  Per consensus #9,
-    the prediction itself (pure NumPy arithmetic) is fast enough to run inline;
-    only the image-decode work stays inside ``to_thread()``.
+    Synchronous because feature extraction (PIL resize + scipy Sobel) is CPU-bound;
+    callers in async context wrap this in ``asyncio.to_thread()`` per the project's
+    async discipline (see ``CLAUDE.md``).
 
     Steps
     -----
@@ -89,6 +89,21 @@ def _png_fitted_bpp(
     5. Compute predicted BPP via dot-product.
     6. Sanity-check the prediction (basic OOB + content-aware ratio gate).
     """
+    try:
+        return _png_fitted_bpp_inner(img, orig_w, orig_h, quality, orig_size)
+    except Exception as exc:
+        logger.warning("png fitted estimator internal error: %s", exc, exc_info=True)
+        return FittedFallback(reason="internal_error")
+
+
+def _png_fitted_bpp_inner(
+    img: "Image.Image",
+    orig_w: int,
+    orig_h: int,
+    quality: int,
+    orig_size: int = 0,
+) -> FittedBpp | FittedFallback:
+    """Inner implementation — called by ``_png_fitted_bpp`` which wraps in try/except."""
     import math
 
     import numpy as np

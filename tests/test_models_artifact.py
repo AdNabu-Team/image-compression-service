@@ -39,7 +39,7 @@ _VALID_ARTIFACT: dict = {
     },
     "coefficients": {
         "intercept": 0.5,
-        "coef": [0.1, -0.2, 0.05, 0.3, -0.01, 0.15, -0.05],
+        "betas": [0.1, -0.2, 0.05, 0.3, -0.01, 0.15, -0.05],
         "knot_beta": 0.3,
         "knot_q50_beta": -0.01,
         "knot_q70_beta": 0.02,
@@ -141,6 +141,90 @@ class TestPngModelFromJson:
         assert isinstance(result, Loaded)
         with pytest.raises((AttributeError, TypeError)):
             result.model.format = "jpeg"  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# Schema validation negative tests (#3 — coefficients shape / bounds)
+# ---------------------------------------------------------------------------
+
+
+class TestPngModelSchemaValidation:
+    """Negative tests for _validate_schema — structural and numeric bounds."""
+
+    def test_from_json_rejects_unknown_coefficient_key(self, tmp_path: Path):
+        """coefficients shape with 'coef' instead of 'betas' must return LoadFailed('parse_error')."""
+        bad = dict(_VALID_ARTIFACT)
+        bad["coefficients"] = {
+            "intercept": 0.5,
+            "coef": [0.1, -0.2, 0.05, 0.3, -0.01, 0.15, -0.05],  # wrong key
+            "knot_beta": 0.3,
+            "knot_q50_beta": -0.01,
+            "knot_q70_beta": 0.02,
+        }
+        p = _write_artifact(tmp_path, payload=bad)
+        result = PngModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_from_json_rejects_missing_intercept(self, tmp_path: Path):
+        """coefficients dict without 'intercept' must return LoadFailed('parse_error')."""
+        bad = dict(_VALID_ARTIFACT)
+        bad["coefficients"] = {
+            "betas": [0.1, -0.2, 0.05, 0.3, -0.01, 0.15, -0.05],
+            # 'intercept' intentionally missing
+            "knot_beta": 0.3,
+            "knot_q50_beta": -0.01,
+            "knot_q70_beta": 0.02,
+        }
+        p = _write_artifact(tmp_path, payload=bad)
+        result = PngModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_from_json_rejects_mismatched_betas_length(self, tmp_path: Path):
+        """betas list with wrong length must return LoadFailed('parse_error')."""
+        bad = dict(_VALID_ARTIFACT)
+        bad["coefficients"] = {
+            "intercept": 0.5,
+            "betas": [0.1, -0.2],  # too short — features has 7 entries
+            "knot_beta": 0.3,
+            "knot_q50_beta": -0.01,
+            "knot_q70_beta": 0.02,
+        }
+        p = _write_artifact(tmp_path, payload=bad)
+        result = PngModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_from_json_rejects_non_finite_coefficients(self, tmp_path: Path):
+        """Non-finite betas (inf/nan) must return LoadFailed('parse_error')."""
+        bad = dict(_VALID_ARTIFACT)
+        bad["coefficients"] = {
+            "intercept": 0.5,
+            "betas": [float("inf"), -0.2, 0.05, 0.3, -0.01, 0.15, -0.05],
+            "knot_beta": 0.3,
+            "knot_q50_beta": -0.01,
+            "knot_q70_beta": 0.02,
+        }
+        p = _write_artifact(tmp_path, payload=bad)
+        result = PngModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_from_json_rejects_beta_out_of_bounds(self, tmp_path: Path):
+        """Beta value exceeding ±100 must return LoadFailed('parse_error')."""
+        bad = dict(_VALID_ARTIFACT)
+        bad["coefficients"] = {
+            "intercept": 0.5,
+            "betas": [999.0, -0.2, 0.05, 0.3, -0.01, 0.15, -0.05],  # 999 > 100
+            "knot_beta": 0.3,
+            "knot_q50_beta": -0.01,
+            "knot_q70_beta": 0.02,
+        }
+        p = _write_artifact(tmp_path, payload=bad)
+        result = PngModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
 
 
 # ---------------------------------------------------------------------------

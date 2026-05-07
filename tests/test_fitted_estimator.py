@@ -334,3 +334,51 @@ def test_prediction_disagreement_fires_on_implausible_ratio(tmp_path: Path) -> N
 
     models_mod.load_png_model.cache_clear()
     models_mod._MODELS_DIR = Path(__file__).parent.parent / "estimation" / "models"
+
+
+# ---------------------------------------------------------------------------
+# Test: internal_error fires when extract_png_features raises unexpectedly
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_png_fitted_internal_error_falls_back(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """When extract_png_features raises, _png_fitted_bpp returns FittedFallback('internal_error')
+    and estimate() falls back to path='direct_encode_sample' with fallback_reason='internal_error'.
+    """
+    import estimation.estimator as estimator_mod
+    import estimation.models as models_mod
+
+    # Write a valid model so model load succeeds
+    model_path = tmp_path / "png_v1.json"
+    model_path.write_text(json.dumps(_valid_model_json()))
+    monkeypatch.setattr(models_mod, "_MODELS_DIR", tmp_path)
+    models_mod.load_png_model.cache_clear()
+
+    # Activate fitted mode
+    monkeypatch.setattr(estimator_mod.settings, "fitted_estimator_mode", "active")
+
+    # Monkeypatch extract_png_features to raise (patch the name bound in estimator_mod)
+    def _raise(*args, **kwargs):
+        raise RuntimeError("simulated internal failure")
+
+    monkeypatch.setattr(estimator_mod, "extract_png_features", _raise)
+
+    data = _make_large_png("RGB", 500, 500)
+
+    from schemas import OptimizationConfig
+
+    config = OptimizationConfig(quality=60, png_lossy=True)
+
+    result = await estimator_mod.estimate(data, config)
+
+    # Should fall back to direct_encode_sample with internal_error reason
+    assert result.path in ("direct_encode_sample", "exact"), f"Unexpected path {result.path!r}"
+    if result.path == "direct_encode_sample":
+        assert result.fallback_reason == "internal_error", (
+            f"Expected fallback_reason='internal_error', got {result.fallback_reason!r}"
+        )
+
+    models_mod.load_png_model.cache_clear()
