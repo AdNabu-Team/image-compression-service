@@ -159,6 +159,8 @@ async def fetch_partial(
         URLFetchError: Fetch failed (timeout, non-2xx non-416, redirect limit).
     """
     start, end = byte_range
+    if start < 0 or end < start:
+        raise ValueError(f"Invalid byte_range: start={start}, end={end}")
     max_bytes = end - start + 1
 
     # 1. SSRF validation on initial URL

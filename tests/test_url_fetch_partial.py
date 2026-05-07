@@ -530,3 +530,38 @@ async def test_fetch_partial_200_remaining_zero_guard():
             data, total = await fetch_partial("https://example.com/img.png", byte_range=(0, 9))
 
     assert len(data) <= 10
+
+
+# ---------------------------------------------------------------------------
+# Input validation: invalid byte_range raises ValueError
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_fetch_partial_negative_start_raises_value_error():
+    """byte_range with negative start raises ValueError."""
+    from utils.url_fetch import fetch_partial
+
+    with patch("utils.url_fetch.validate_url", return_value=None):
+        with pytest.raises(ValueError, match="Invalid byte_range"):
+            await fetch_partial("https://example.com/img.png", byte_range=(-1, 100))
+
+
+@pytest.mark.asyncio
+async def test_fetch_partial_end_before_start_raises_value_error():
+    """byte_range where end < start raises ValueError."""
+    from utils.url_fetch import fetch_partial
+
+    with patch("utils.url_fetch.validate_url", return_value=None):
+        with pytest.raises(ValueError, match="Invalid byte_range"):
+            await fetch_partial("https://example.com/img.png", byte_range=(100, 50))
+
+
+@pytest.mark.asyncio
+async def test_fetch_partial_negative_end_raises_value_error():
+    """byte_range where end is negative (end < start=0) raises ValueError."""
+    from utils.url_fetch import fetch_partial
+
+    with patch("utils.url_fetch.validate_url", return_value=None):
+        with pytest.raises(ValueError, match="Invalid byte_range"):
+            await fetch_partial("https://example.com/img.png", byte_range=(0, -1))
