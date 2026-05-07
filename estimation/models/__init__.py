@@ -27,7 +27,7 @@ import functools
 import logging
 from pathlib import Path
 
-from estimation.models._artifact import Loaded, LoadFailed, PngModel
+from estimation.models._artifact import Loaded, LoadedHeader, LoadFailed, PngHeaderModel, PngModel
 
 logger = logging.getLogger("pare.estimation.models")
 
@@ -54,4 +54,33 @@ def load_png_model() -> Loaded | LoadFailed:
         return LoadFailed(reason="other")
 
 
-__all__ = ["Loaded", "LoadFailed", "PngModel", "load_png_model"]
+@functools.lru_cache(maxsize=1)
+def load_png_header_model() -> LoadedHeader | LoadFailed:
+    """Load the PNG header-only fitted-BPP model artifact.
+
+    Returns ``LoadedHeader(model)`` on success or ``LoadFailed(reason)`` on any failure.
+    Never raises — all exceptions are converted to ``LoadFailed("other")`` (unexpected)
+    or the more specific reason codes handled inside ``PngHeaderModel.from_json()``.
+
+    Loaded but unused by any caller in Phase 1a — dispatch wiring is Phase 2.
+
+    The result is cached for the lifetime of the process (``lru_cache(maxsize=1)``).
+    See module docstring for the CPython call-once caveat.
+    """
+    artifact_path = _MODELS_DIR / "png_header_v1.json"
+    try:
+        return PngHeaderModel.from_json(artifact_path)
+    except Exception as exc:  # defensive — from_json should never raise, but belt-and-suspenders
+        logger.warning("load_png_header_model: unexpected exception: %s", exc)
+        return LoadFailed(reason="other")
+
+
+__all__ = [
+    "Loaded",
+    "LoadedHeader",
+    "LoadFailed",
+    "PngHeaderModel",
+    "PngModel",
+    "load_png_header_model",
+    "load_png_model",
+]

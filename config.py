@@ -55,6 +55,12 @@ class Settings(BaseSettings):
     # Production flips require the staged rollout playbook.
     fitted_estimator_mode: Literal["off", "active"] = "off"
 
+    # --- Range-Fetch / Header-Only Estimation ---
+    header_only_min_size_bytes: int = 1_048_576  # 1 MB
+    """Minimum file size for the header-only Range-fetch path. Smaller files round-trip
+    the Range request in similar time to a full small download, so we just download.
+    Used by routers/estimate.py URL-mode dispatch (Phase 2 — not wired yet)."""
+
     # --- Logging ---
     log_level: str = "ERROR"
 

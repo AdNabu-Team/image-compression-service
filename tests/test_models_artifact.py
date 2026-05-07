@@ -13,7 +13,14 @@ from pathlib import Path
 
 import pytest
 
-from estimation.models import Loaded, LoadFailed, load_png_model
+from estimation.models import (
+    Loaded,
+    LoadedHeader,
+    LoadFailed,
+    load_png_header_model,
+    load_png_model,
+)
+from estimation.models._artifact import PngHeaderModel as PngHeaderModelDirect
 from estimation.models._artifact import PngModel as PngModelDirect
 
 # ---------------------------------------------------------------------------
@@ -356,5 +363,267 @@ class TestLoadPngModel:
         load_png_model.cache_clear()
 
         result = load_png_model()
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "version_mismatch"
+
+
+# ===========================================================================
+# PngHeaderModel tests
+# ===========================================================================
+
+_VALID_HEADER_ARTIFACT: dict = {
+    "model_version": 1,
+    "format": "png_header",
+    "features": ["has_alpha", "quality", "log10_orig_pixels", "input_bpp"],
+    "scaler": {
+        "mean": [0.3, 65.0, 5.5, 9.0],
+        "scale": [0.45, 18.0, 0.7, 5.0],
+    },
+    "coefficients": {
+        "intercept": 0.8,
+        "betas": [0.1, -0.05, -0.2, 0.3],
+        "knot_q50_beta": -0.02,
+        "knot_q70_beta": 0.01,
+    },
+    "knot_q50": 50.0,
+    "knot_q70": 70.0,
+    "training_envelope": {
+        "has_alpha": [0.0, 1.0],
+        "quality": [40.0, 85.0],
+    },
+    "training_corpus_sha256": "deadbeef1234",
+    "git_sha": "abc1234",
+    "fit_environment": {
+        "numpy_version": "2.0.2",
+        "scipy_version": "1.14.0",
+    },
+    "created_at": "2026-05-07T00:00:00+00:00",
+}
+
+
+def _write_header_artifact(
+    tmp_path: Path, payload: dict | None = None, raw: str | None = None
+) -> Path:
+    p = tmp_path / "png_header_v1.json"
+    if raw is not None:
+        p.write_text(raw)
+    else:
+        p.write_text(json.dumps(payload or _VALID_HEADER_ARTIFACT))
+    return p
+
+
+class TestPngHeaderModelFromJson:
+    def test_missing_file_returns_load_failed(self, tmp_path: Path):
+        missing = tmp_path / "does_not_exist.json"
+        result = PngHeaderModelDirect.from_json(missing)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "missing"
+
+    def test_corrupt_json_returns_load_failed(self, tmp_path: Path):
+        p = _write_header_artifact(tmp_path, raw="{not valid json")
+        result = PngHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_version_mismatch_returns_load_failed(self, tmp_path: Path):
+        bad = dict(_VALID_HEADER_ARTIFACT, model_version=99)
+        p = _write_header_artifact(tmp_path, payload=bad)
+        result = PngHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "version_mismatch"
+
+    def test_wrong_format_string_returns_parse_error(self, tmp_path: Path):
+        bad = dict(_VALID_HEADER_ARTIFACT, format="png")  # must be "png_header"
+        p = _write_header_artifact(tmp_path, payload=bad)
+        result = PngHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_wrong_features_returns_parse_error(self, tmp_path: Path):
+        bad = dict(_VALID_HEADER_ARTIFACT, features=["has_alpha", "quality"])
+        p = _write_header_artifact(tmp_path, payload=bad)
+        result = PngHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_missing_required_field_returns_parse_error(self, tmp_path: Path):
+        bad = {k: v for k, v in _VALID_HEADER_ARTIFACT.items() if k != "training_corpus_sha256"}
+        p = _write_header_artifact(tmp_path, payload=bad)
+        result = PngHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_happy_path_returns_loaded_header(self, tmp_path: Path):
+        p = _write_header_artifact(tmp_path)
+        result = PngHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadedHeader)
+        model = result.model
+        assert isinstance(model, PngHeaderModelDirect)
+        assert model.model_version == 1
+        assert model.format == "png_header"
+        assert model.knot_q50 == pytest.approx(50.0)
+        assert model.knot_q70 == pytest.approx(70.0)
+        assert model.git_sha == "abc1234"
+        assert "numpy_version" in model.fit_environment
+
+    def test_happy_path_features_preserved(self, tmp_path: Path):
+        p = _write_header_artifact(tmp_path)
+        result = PngHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadedHeader)
+        assert result.model.features == _VALID_HEADER_ARTIFACT["features"]
+
+    def test_model_is_frozen(self, tmp_path: Path):
+        p = _write_header_artifact(tmp_path)
+        result = PngHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadedHeader)
+        with pytest.raises((AttributeError, TypeError)):
+            result.model.format = "jpeg"  # type: ignore[misc]
+
+    def test_rejects_oob_intercept(self, tmp_path: Path):
+        bad = dict(_VALID_HEADER_ARTIFACT)
+        bad["coefficients"] = dict(_VALID_HEADER_ARTIFACT["coefficients"])
+        bad["coefficients"]["intercept"] = 9999.0  # > 1000
+        p = _write_header_artifact(tmp_path, payload=bad)
+        result = PngHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_rejects_oob_betas(self, tmp_path: Path):
+        bad = dict(_VALID_HEADER_ARTIFACT)
+        bad["coefficients"] = dict(_VALID_HEADER_ARTIFACT["coefficients"])
+        bad["coefficients"]["betas"] = [999.0, 0.0, 0.0, 0.0]  # 999 > 100
+        p = _write_header_artifact(tmp_path, payload=bad)
+        result = PngHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_rejects_non_finite_betas(self, tmp_path: Path):
+        bad = dict(_VALID_HEADER_ARTIFACT)
+        bad["coefficients"] = dict(_VALID_HEADER_ARTIFACT["coefficients"])
+        bad["coefficients"]["betas"] = [float("nan"), 0.0, 0.0, 0.0]
+        p = _write_header_artifact(tmp_path, payload=bad)
+        result = PngHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_rejects_mismatched_betas_length(self, tmp_path: Path):
+        bad = dict(_VALID_HEADER_ARTIFACT)
+        bad["coefficients"] = dict(_VALID_HEADER_ARTIFACT["coefficients"])
+        bad["coefficients"]["betas"] = [0.1, 0.2]  # too short (need 4)
+        p = _write_header_artifact(tmp_path, payload=bad)
+        result = PngHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_rejects_missing_knot_q50_beta(self, tmp_path: Path):
+        bad = dict(_VALID_HEADER_ARTIFACT)
+        bad["coefficients"] = {
+            "intercept": 0.8,
+            "betas": [0.1, -0.05, -0.2, 0.3],
+            # knot_q50_beta intentionally missing
+            "knot_q70_beta": 0.01,
+        }
+        p = _write_header_artifact(tmp_path, payload=bad)
+        result = PngHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_rejects_oob_knot_beta(self, tmp_path: Path):
+        bad = dict(_VALID_HEADER_ARTIFACT)
+        bad["coefficients"] = dict(_VALID_HEADER_ARTIFACT["coefficients"])
+        bad["coefficients"]["knot_q50_beta"] = 1e9  # way out of bounds
+        p = _write_header_artifact(tmp_path, payload=bad)
+        result = PngHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_rejects_non_finite_scaler(self, tmp_path: Path):
+        bad = dict(_VALID_HEADER_ARTIFACT)
+        bad["scaler"] = {"mean": [float("inf"), 65.0, 5.5, 9.0], "scale": [0.45, 18.0, 0.7, 5.0]}
+        p = _write_header_artifact(tmp_path, payload=bad)
+        result = PngHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_rejects_wrong_scaler_length(self, tmp_path: Path):
+        bad = dict(_VALID_HEADER_ARTIFACT)
+        bad["scaler"] = {"mean": [0.3, 65.0], "scale": [0.45, 18.0]}  # too short
+        p = _write_header_artifact(tmp_path, payload=bad)
+        result = PngHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+
+class TestLoadPngHeaderModel:
+    def _clear_cache(self):
+        load_png_header_model.cache_clear()
+
+    def test_does_not_raise_on_missing_artifact(self):
+        """load_png_header_model() should return LoadFailed, not raise, when artifact absent."""
+        self._clear_cache()
+        result = load_png_header_model()
+        assert isinstance(result, (LoadedHeader, LoadFailed))
+
+    def test_does_not_raise_when_called_multiple_times(self):
+        self._clear_cache()
+        for _ in range(5):
+            result = load_png_header_model()
+            assert isinstance(result, (LoadedHeader, LoadFailed))
+
+    def test_returns_loaded_header_on_valid_artifact(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """With a valid header artifact in tmp_path → LoadedHeader."""
+        _write_header_artifact(tmp_path)
+        self._clear_cache()
+        import estimation.models as models_mod
+
+        monkeypatch.setattr(models_mod, "_MODELS_DIR", tmp_path)
+        load_png_header_model.cache_clear()
+
+        result = load_png_header_model()
+        assert isinstance(result, LoadedHeader)
+        assert result.model.format == "png_header"
+
+    def test_returns_load_failed_on_missing_file(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """Empty tmp_path has no png_header_v1.json → LoadFailed."""
+        self._clear_cache()
+        import estimation.models as models_mod
+
+        monkeypatch.setattr(models_mod, "_MODELS_DIR", tmp_path)
+        load_png_header_model.cache_clear()
+
+        result = load_png_header_model()
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "missing"
+
+    def test_returns_load_failed_on_corrupt_json(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        (tmp_path / "png_header_v1.json").write_text("{bad json")
+        self._clear_cache()
+        import estimation.models as models_mod
+
+        monkeypatch.setattr(models_mod, "_MODELS_DIR", tmp_path)
+        load_png_header_model.cache_clear()
+
+        result = load_png_header_model()
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_returns_load_failed_on_version_mismatch(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        bad = dict(_VALID_HEADER_ARTIFACT, model_version=99)
+        (tmp_path / "png_header_v1.json").write_text(json.dumps(bad))
+        self._clear_cache()
+        import estimation.models as models_mod
+
+        monkeypatch.setattr(models_mod, "_MODELS_DIR", tmp_path)
+        load_png_header_model.cache_clear()
+
+        result = load_png_header_model()
         assert isinstance(result, LoadFailed)
         assert result.reason == "version_mismatch"
