@@ -180,6 +180,22 @@ class PngModel:
                 logger.debug("PngModel schema validation failed: %s", reason)
                 return reason
 
+        # --- knot beta bounds (security: prevent adversarial artifacts) ---
+        for knot_key in ("knot_beta", "knot_q50_beta", "knot_q70_beta"):
+            if knot_key not in coefficients:
+                reason = f"coefficients missing required key '{knot_key}'"
+                logger.debug("PngModel schema validation failed: %s", reason)
+                return reason
+            knot_val = coefficients[knot_key]
+            if not isinstance(knot_val, (int, float)) or not math.isfinite(float(knot_val)):
+                reason = f"coefficients['{knot_key}'] is not finite: {knot_val!r}"
+                logger.debug("PngModel schema validation failed: %s", reason)
+                return reason
+            if abs(float(knot_val)) > 100.0:
+                reason = f"coefficients['{knot_key}'] = {knot_val} exceeds ±100 bound"
+                logger.debug("PngModel schema validation failed: %s", reason)
+                return reason
+
         return None
 
     @classmethod

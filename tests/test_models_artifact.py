@@ -226,6 +226,51 @@ class TestPngModelSchemaValidation:
         assert isinstance(result, LoadFailed)
         assert result.reason == "parse_error"
 
+    def test_from_json_rejects_missing_knot_beta(self, tmp_path: Path):
+        """coefficients dict without 'knot_beta' must return LoadFailed('parse_error')."""
+        bad = dict(_VALID_ARTIFACT)
+        bad["coefficients"] = {
+            "intercept": 0.5,
+            "betas": [0.1, -0.2, 0.05, 0.3, -0.01, 0.15, -0.05],
+            # 'knot_beta' intentionally missing
+            "knot_q50_beta": -0.01,
+            "knot_q70_beta": 0.02,
+        }
+        p = _write_artifact(tmp_path, payload=bad)
+        result = PngModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_from_json_rejects_oob_knot_beta(self, tmp_path: Path):
+        """knot_q50_beta value exceeding ±100 must return LoadFailed('parse_error')."""
+        bad = dict(_VALID_ARTIFACT)
+        bad["coefficients"] = {
+            "intercept": 0.5,
+            "betas": [0.1, -0.2, 0.05, 0.3, -0.01, 0.15, -0.05],
+            "knot_beta": 0.3,
+            "knot_q50_beta": 1e10,  # way out of bounds
+            "knot_q70_beta": 0.02,
+        }
+        p = _write_artifact(tmp_path, payload=bad)
+        result = PngModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_from_json_rejects_non_finite_knot_beta(self, tmp_path: Path):
+        """Non-finite knot_q70_beta (inf) must return LoadFailed('parse_error')."""
+        bad = dict(_VALID_ARTIFACT)
+        bad["coefficients"] = {
+            "intercept": 0.5,
+            "betas": [0.1, -0.2, 0.05, 0.3, -0.01, 0.15, -0.05],
+            "knot_beta": 0.3,
+            "knot_q50_beta": -0.01,
+            "knot_q70_beta": float("inf"),
+        }
+        p = _write_artifact(tmp_path, payload=bad)
+        result = PngModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
 
 # ---------------------------------------------------------------------------
 # load_png_model() wrapper tests (goes through estimation/models/__init__.py)
