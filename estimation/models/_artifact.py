@@ -4,13 +4,12 @@ Mirrors the ``bench/corpus/manifest.py`` precedent: ``@dataclass(frozen=True, sl
 with a ``from_json()`` classmethod.  No Pydantic — frozen dataclasses have ~10× lower
 instantiation overhead for a once-per-process load.
 
-Only ``PngModel`` is defined here for Phase 1.  ``JpegModel`` is deferred to Phase 2.
-
 ``optimizer_quality_logic_sha256`` is intentionally omitted from this MVP (Phase 1 scope cut).
 It will be added in Phase 2 once ``bench/fit/png.py`` is implemented.
 
-``Loaded`` and ``LoadFailed`` live here (not in ``__init__.py``) so that ``PngModel.from_json``
-can return them without a circular import.  ``estimation/models/__init__.py`` re-exports them.
+``Loaded``, ``LoadedHeader``, ``LoadedJpeg``, and ``LoadFailed`` live here (not in
+``__init__.py``) so that model ``from_json`` methods can return them without a circular
+import.  ``estimation/models/__init__.py`` re-exports them.
 """
 
 from __future__ import annotations
@@ -508,3 +507,239 @@ class PngHeaderModel:
             return LoadFailed(reason="parse_error")
 
         return LoadedHeader(model=model)
+
+
+# ---------------------------------------------------------------------------
+# JpegHeaderModel — header-only JPEG estimator (Phase 1b)
+# ---------------------------------------------------------------------------
+
+# Supported version for the header-only JPEG model.
+_SUPPORTED_JPEG_HEADER_MODEL_VERSION = 1
+
+# Expected feature list — validated exactly at load time.
+_JPEG_HEADER_FEATURES = [
+    "target_quality",
+    "source_quality",
+    "nse",
+    "subsampling_444",
+    "subsampling_422",
+    "subsampling_420",
+    "progressive",
+    "log10_orig_pixels",
+    "input_bpp",
+    "mean_dqt_luma",
+    "std_dqt_luma",
+    "mean_dqt_chroma",
+    "std_dqt_chroma",
+]
+
+
+@dataclass(frozen=True, slots=True)
+class LoadedJpeg:
+    """Successful JPEG header-model load result."""
+
+    model: "JpegHeaderModel"
+
+
+@dataclass(frozen=True, slots=True)
+class JpegHeaderModel:
+    """Header-only JPEG model. Decode-free inference from header parsing
+    + LSM source-Q estimation.
+
+    Fields
+    ------
+    model_version : int
+        Schema version.  Must equal ``_SUPPORTED_JPEG_HEADER_MODEL_VERSION`` (1).
+    format : str
+        Always ``"jpeg_header"``.
+    features : list[str]
+        Exactly the 13 canonical feature names defined in ``_JPEG_HEADER_FEATURES``.
+    scaler : dict[str, list[float]]
+        ``StandardScaler`` params: ``{"mean": [...], "scale": [...]}``.
+        Both lists have 13 elements, one per feature.
+    coefficients : dict[str, Any]
+        Regression coefficients:
+        ``{"intercept": float, "betas": list[float]}``.
+        ``betas`` has 13 elements (one per feature).
+    training_envelope : dict[str, list[float]]
+        Forensic min/max per feature.  Not used at runtime.
+    training_corpus_sha256 : str
+        SHA-256 of the training corpus manifest file.
+    git_sha : str
+        Git commit SHA at fit time.
+    fit_environment : dict[str, str]
+        Build environment metadata (``numpy_version``, ``scipy_version``).
+    created_at : str
+        ISO-8601 timestamp of the fit run.
+    """
+
+    model_version: int
+    format: str
+    features: list[str]
+    scaler: dict[str, list[float]]
+    coefficients: dict[str, Any]
+    training_envelope: dict[str, list[float]]
+    training_corpus_sha256: str
+    git_sha: str
+    fit_environment: dict[str, str]
+    created_at: str
+
+    @classmethod
+    def _validate_schema(cls, raw: dict[str, Any], features: list[str]) -> str | None:
+        """Validate scaler/coefficients shapes and numeric bounds.
+
+        Returns ``None`` on success, or a human-readable reason string on failure.
+        """
+        n_features = len(features)
+
+        # --- scaler shape ---
+        scaler = raw.get("scaler")
+        if not isinstance(scaler, dict) or "mean" not in scaler or "scale" not in scaler:
+            reason = "scaler must be a dict with keys 'mean' and 'scale'"
+            logger.debug("JpegHeaderModel schema validation failed: %s", reason)
+            return reason
+        if not isinstance(scaler["mean"], list) or not isinstance(scaler["scale"], list):
+            reason = "scaler['mean'] and scaler['scale'] must be lists"
+            logger.debug("JpegHeaderModel schema validation failed: %s", reason)
+            return reason
+        if len(scaler["mean"]) != n_features or len(scaler["scale"]) != n_features:
+            reason = (
+                f"scaler mean/scale length {len(scaler['mean'])}/{len(scaler['scale'])} "
+                f"!= features length {n_features}"
+            )
+            logger.debug("JpegHeaderModel schema validation failed: %s", reason)
+            return reason
+        for val in scaler["mean"] + scaler["scale"]:
+            if not isinstance(val, (int, float)) or not math.isfinite(float(val)):
+                reason = f"non-finite value in scaler: {val!r}"
+                logger.debug("JpegHeaderModel schema validation failed: %s", reason)
+                return reason
+
+        # --- coefficients shape ---
+        coefficients = raw.get("coefficients")
+        if not isinstance(coefficients, dict):
+            reason = "coefficients must be a dict"
+            logger.debug("JpegHeaderModel schema validation failed: %s", reason)
+            return reason
+        for required_key in ("intercept", "betas"):
+            if required_key not in coefficients:
+                reason = f"coefficients missing required key '{required_key}'"
+                logger.debug("JpegHeaderModel schema validation failed: %s", reason)
+                return reason
+
+        betas = coefficients["betas"]
+        intercept = coefficients["intercept"]
+
+        if not isinstance(betas, list):
+            reason = "coefficients['betas'] must be a list"
+            logger.debug("JpegHeaderModel schema validation failed: %s", reason)
+            return reason
+        if len(betas) != n_features:
+            reason = f"coefficients['betas'] length {len(betas)} != features length {n_features}"
+            logger.debug("JpegHeaderModel schema validation failed: %s", reason)
+            return reason
+        if not isinstance(intercept, (int, float)) or not math.isfinite(float(intercept)):
+            reason = f"coefficients['intercept'] is not finite: {intercept!r}"
+            logger.debug("JpegHeaderModel schema validation failed: %s", reason)
+            return reason
+
+        # --- numeric bounds (security: prevent adversarial artifacts) ---
+        if abs(float(intercept)) > 1000.0:
+            reason = f"intercept {intercept} exceeds ±1000 bound"
+            logger.debug("JpegHeaderModel schema validation failed: %s", reason)
+            return reason
+        for i, b in enumerate(betas):
+            if not isinstance(b, (int, float)) or not math.isfinite(float(b)):
+                reason = f"non-finite beta[{i}]: {b!r}"
+                logger.debug("JpegHeaderModel schema validation failed: %s", reason)
+                return reason
+            if abs(float(b)) > 100.0:
+                reason = f"beta[{i}] = {b} exceeds ±100 bound"
+                logger.debug("JpegHeaderModel schema validation failed: %s", reason)
+                return reason
+
+        return None
+
+    @classmethod
+    def from_json(cls, path: Path) -> "LoadedJpeg | LoadFailed":
+        """Load and validate a ``JpegHeaderModel`` from a JSON file at *path*.
+
+        Returns ``LoadedJpeg(model)`` on success.  Returns ``LoadFailed(reason)`` on:
+
+        - ``path`` does not exist → ``"missing"``
+        - JSON parse error or schema mismatch → ``"parse_error"``
+        - ``model_version != _SUPPORTED_JPEG_HEADER_MODEL_VERSION`` → ``"version_mismatch"``
+        - Any other unexpected exception → ``"other"``
+
+        Never raises.
+        """
+        if not path.exists():
+            logger.warning("JpegHeaderModel artifact not found: %s", path)
+            return LoadFailed(reason="missing")
+
+        try:
+            raw: dict[str, Any] = json.loads(path.read_text())
+        except (json.JSONDecodeError, OSError, ValueError) as exc:
+            logger.warning("JpegHeaderModel artifact parse error (%s): %s", path, exc)
+            return LoadFailed(reason="parse_error")
+
+        try:
+            version = raw["model_version"]
+        except (KeyError, TypeError) as exc:
+            logger.warning("JpegHeaderModel artifact missing model_version (%s): %s", path, exc)
+            return LoadFailed(reason="parse_error")
+
+        if version != _SUPPORTED_JPEG_HEADER_MODEL_VERSION:
+            logger.warning(
+                "JpegHeaderModel artifact version mismatch: expected %d, got %r (%s)",
+                _SUPPORTED_JPEG_HEADER_MODEL_VERSION,
+                version,
+                path,
+            )
+            return LoadFailed(reason="version_mismatch")
+
+        try:
+            fmt = str(raw["format"])
+            if fmt != "jpeg_header":
+                logger.warning(
+                    "JpegHeaderModel artifact format mismatch: expected 'jpeg_header', got %r (%s)",
+                    fmt,
+                    path,
+                )
+                return LoadFailed(reason="parse_error")
+
+            features = list(raw["features"])
+            if features != _JPEG_HEADER_FEATURES:
+                logger.warning(
+                    "JpegHeaderModel features mismatch: expected %r, got %r (%s)",
+                    _JPEG_HEADER_FEATURES,
+                    features,
+                    path,
+                )
+                return LoadFailed(reason="parse_error")
+
+            model = cls(
+                model_version=int(raw["model_version"]),
+                format=fmt,
+                features=features,
+                scaler=dict(raw["scaler"]),
+                coefficients=dict(raw["coefficients"]),
+                training_envelope=dict(raw.get("training_envelope") or {}),
+                training_corpus_sha256=str(raw["training_corpus_sha256"]),
+                git_sha=str(raw["git_sha"]),
+                fit_environment=dict(raw["fit_environment"]),
+                created_at=str(raw["created_at"]),
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            logger.warning("JpegHeaderModel artifact schema error (%s): %s", path, exc)
+            return LoadFailed(reason="parse_error")
+
+        # Validate scaler/coefficients shapes and numeric bounds
+        validation_error = cls._validate_schema(raw, model.features)
+        if validation_error is not None:
+            logger.warning(
+                "JpegHeaderModel artifact validation failed (%s): %s", path, validation_error
+            )
+            return LoadFailed(reason="parse_error")
+
+        return LoadedJpeg(model=model)

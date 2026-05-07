@@ -4,8 +4,8 @@ Covers:
 - Missing file → LoadFailed("missing")
 - Corrupt JSON → LoadFailed("parse_error")
 - model_version mismatch → LoadFailed("version_mismatch")
-- Happy path → Loaded(model) with correct PngModel fields
-- load_png_model() never raises (including on all failure modes)
+- Happy path → Loaded(model) with correct PngModel / JpegHeaderModel fields
+- load_png_model() / load_jpeg_header_model() never raise (including on all failure modes)
 """
 
 import json
@@ -16,10 +16,13 @@ import pytest
 from estimation.models import (
     Loaded,
     LoadedHeader,
+    LoadedJpeg,
     LoadFailed,
+    load_jpeg_header_model,
     load_png_header_model,
     load_png_model,
 )
+from estimation.models._artifact import JpegHeaderModel as JpegHeaderModelDirect
 from estimation.models._artifact import PngHeaderModel as PngHeaderModelDirect
 from estimation.models._artifact import PngModel as PngModelDirect
 
@@ -625,5 +628,282 @@ class TestLoadPngHeaderModel:
         load_png_header_model.cache_clear()
 
         result = load_png_header_model()
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "version_mismatch"
+
+
+# ===========================================================================
+# JpegHeaderModel tests
+# ===========================================================================
+
+_JPEG_HEADER_FEATURES = [
+    "target_quality",
+    "source_quality",
+    "nse",
+    "subsampling_444",
+    "subsampling_422",
+    "subsampling_420",
+    "progressive",
+    "log10_orig_pixels",
+    "input_bpp",
+    "mean_dqt_luma",
+    "std_dqt_luma",
+    "mean_dqt_chroma",
+    "std_dqt_chroma",
+]
+
+_VALID_JPEG_HEADER_ARTIFACT: dict = {
+    "model_version": 1,
+    "format": "jpeg_header",
+    "features": _JPEG_HEADER_FEATURES,
+    "scaler": {
+        "mean": [62.5, 75.0, 0.98, 0.4, 0.2, 0.3, 0.1, 5.8, 3.5, 42.0, 20.0, 55.0, 25.0],
+        "scale": [18.0, 15.0, 0.05, 0.49, 0.4, 0.46, 0.3, 0.6, 2.5, 18.0, 12.0, 22.0, 14.0],
+    },
+    "coefficients": {
+        "intercept": 0.6,
+        "betas": [
+            -0.05,
+            -0.03,
+            0.02,
+            0.01,
+            -0.01,
+            0.00,
+            0.00,
+            -0.10,
+            0.08,
+            0.02,
+            0.01,
+            0.01,
+            0.00,
+        ],
+    },
+    "training_envelope": {
+        "target_quality": [40.0, 85.0],
+        "source_quality": [1.0, 100.0],
+    },
+    "training_corpus_sha256": "abcdef1234567890",
+    "git_sha": "deadbeef",
+    "fit_environment": {
+        "numpy_version": "2.0.2",
+        "scipy_version": "1.14.0",
+    },
+    "created_at": "2026-05-07T00:00:00+00:00",
+}
+
+
+def _write_jpeg_header_artifact(
+    tmp_path: Path, payload: dict | None = None, raw: str | None = None
+) -> Path:
+    p = tmp_path / "jpeg_header_v1.json"
+    if raw is not None:
+        p.write_text(raw)
+    else:
+        p.write_text(json.dumps(payload or _VALID_JPEG_HEADER_ARTIFACT))
+    return p
+
+
+class TestJpegHeaderModelFromJson:
+    def test_missing_file_returns_load_failed(self, tmp_path: Path):
+        missing = tmp_path / "does_not_exist.json"
+        result = JpegHeaderModelDirect.from_json(missing)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "missing"
+
+    def test_corrupt_json_returns_load_failed(self, tmp_path: Path):
+        p = _write_jpeg_header_artifact(tmp_path, raw="{not valid json")
+        result = JpegHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_version_mismatch_returns_load_failed(self, tmp_path: Path):
+        bad = dict(_VALID_JPEG_HEADER_ARTIFACT, model_version=99)
+        p = _write_jpeg_header_artifact(tmp_path, payload=bad)
+        result = JpegHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "version_mismatch"
+
+    def test_wrong_format_string_returns_parse_error(self, tmp_path: Path):
+        bad = dict(_VALID_JPEG_HEADER_ARTIFACT, format="jpeg")  # must be "jpeg_header"
+        p = _write_jpeg_header_artifact(tmp_path, payload=bad)
+        result = JpegHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_wrong_features_returns_parse_error(self, tmp_path: Path):
+        bad = dict(_VALID_JPEG_HEADER_ARTIFACT, features=["target_quality", "source_quality"])
+        p = _write_jpeg_header_artifact(tmp_path, payload=bad)
+        result = JpegHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_missing_required_field_returns_parse_error(self, tmp_path: Path):
+        bad = {
+            k: v for k, v in _VALID_JPEG_HEADER_ARTIFACT.items() if k != "training_corpus_sha256"
+        }
+        p = _write_jpeg_header_artifact(tmp_path, payload=bad)
+        result = JpegHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_happy_path_returns_loaded_jpeg(self, tmp_path: Path):
+        p = _write_jpeg_header_artifact(tmp_path)
+        result = JpegHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadedJpeg)
+        model = result.model
+        assert isinstance(model, JpegHeaderModelDirect)
+        assert model.model_version == 1
+        assert model.format == "jpeg_header"
+        assert model.git_sha == "deadbeef"
+        assert "numpy_version" in model.fit_environment
+
+    def test_happy_path_features_preserved(self, tmp_path: Path):
+        p = _write_jpeg_header_artifact(tmp_path)
+        result = JpegHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadedJpeg)
+        assert result.model.features == _JPEG_HEADER_FEATURES
+
+    def test_model_is_frozen(self, tmp_path: Path):
+        p = _write_jpeg_header_artifact(tmp_path)
+        result = JpegHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadedJpeg)
+        with pytest.raises((AttributeError, TypeError)):
+            result.model.format = "jpeg"  # type: ignore[misc]
+
+    def test_rejects_oob_intercept(self, tmp_path: Path):
+        bad = dict(_VALID_JPEG_HEADER_ARTIFACT)
+        bad["coefficients"] = dict(_VALID_JPEG_HEADER_ARTIFACT["coefficients"])
+        bad["coefficients"]["intercept"] = 9999.0  # > 1000
+        p = _write_jpeg_header_artifact(tmp_path, payload=bad)
+        result = JpegHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_rejects_oob_betas(self, tmp_path: Path):
+        bad = dict(_VALID_JPEG_HEADER_ARTIFACT)
+        bad["coefficients"] = dict(_VALID_JPEG_HEADER_ARTIFACT["coefficients"])
+        bad["coefficients"]["betas"] = [999.0] + [0.0] * 12  # first beta > 100
+        p = _write_jpeg_header_artifact(tmp_path, payload=bad)
+        result = JpegHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_rejects_non_finite_betas(self, tmp_path: Path):
+        bad = dict(_VALID_JPEG_HEADER_ARTIFACT)
+        bad["coefficients"] = dict(_VALID_JPEG_HEADER_ARTIFACT["coefficients"])
+        bad["coefficients"]["betas"] = [float("nan")] + [0.0] * 12
+        p = _write_jpeg_header_artifact(tmp_path, payload=bad)
+        result = JpegHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_rejects_mismatched_betas_length(self, tmp_path: Path):
+        bad = dict(_VALID_JPEG_HEADER_ARTIFACT)
+        bad["coefficients"] = dict(_VALID_JPEG_HEADER_ARTIFACT["coefficients"])
+        bad["coefficients"]["betas"] = [0.1, 0.2]  # too short (need 13)
+        p = _write_jpeg_header_artifact(tmp_path, payload=bad)
+        result = JpegHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_rejects_missing_intercept(self, tmp_path: Path):
+        bad = dict(_VALID_JPEG_HEADER_ARTIFACT)
+        bad["coefficients"] = {"betas": [0.0] * 13}  # intercept missing
+        p = _write_jpeg_header_artifact(tmp_path, payload=bad)
+        result = JpegHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_rejects_non_finite_scaler(self, tmp_path: Path):
+        bad = dict(_VALID_JPEG_HEADER_ARTIFACT)
+        bad["scaler"] = {
+            "mean": [float("inf")] + [0.0] * 12,
+            "scale": [1.0] * 13,
+        }
+        p = _write_jpeg_header_artifact(tmp_path, payload=bad)
+        result = JpegHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_rejects_wrong_scaler_length(self, tmp_path: Path):
+        bad = dict(_VALID_JPEG_HEADER_ARTIFACT)
+        bad["scaler"] = {"mean": [0.3, 65.0], "scale": [0.45, 18.0]}  # too short (need 13)
+        p = _write_jpeg_header_artifact(tmp_path, payload=bad)
+        result = JpegHeaderModelDirect.from_json(p)
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+
+class TestLoadJpegHeaderModel:
+    def _clear_cache(self):
+        load_jpeg_header_model.cache_clear()
+
+    def test_does_not_raise_on_missing_artifact(self):
+        """load_jpeg_header_model() should return LoadFailed, not raise, when artifact absent."""
+        self._clear_cache()
+        result = load_jpeg_header_model()
+        assert isinstance(result, (LoadedJpeg, LoadFailed))
+
+    def test_does_not_raise_when_called_multiple_times(self):
+        self._clear_cache()
+        for _ in range(5):
+            result = load_jpeg_header_model()
+            assert isinstance(result, (LoadedJpeg, LoadFailed))
+
+    def test_returns_loaded_jpeg_on_valid_artifact(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """With a valid JPEG header artifact in tmp_path → LoadedJpeg."""
+        _write_jpeg_header_artifact(tmp_path)
+        self._clear_cache()
+        import estimation.models as models_mod
+
+        monkeypatch.setattr(models_mod, "_MODELS_DIR", tmp_path)
+        load_jpeg_header_model.cache_clear()
+
+        result = load_jpeg_header_model()
+        assert isinstance(result, LoadedJpeg)
+        assert result.model.format == "jpeg_header"
+
+    def test_returns_load_failed_on_missing_file(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """Empty tmp_path has no jpeg_header_v1.json → LoadFailed."""
+        self._clear_cache()
+        import estimation.models as models_mod
+
+        monkeypatch.setattr(models_mod, "_MODELS_DIR", tmp_path)
+        load_jpeg_header_model.cache_clear()
+
+        result = load_jpeg_header_model()
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "missing"
+
+    def test_returns_load_failed_on_corrupt_json(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        (tmp_path / "jpeg_header_v1.json").write_text("{bad json")
+        self._clear_cache()
+        import estimation.models as models_mod
+
+        monkeypatch.setattr(models_mod, "_MODELS_DIR", tmp_path)
+        load_jpeg_header_model.cache_clear()
+
+        result = load_jpeg_header_model()
+        assert isinstance(result, LoadFailed)
+        assert result.reason == "parse_error"
+
+    def test_returns_load_failed_on_version_mismatch(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        bad = dict(_VALID_JPEG_HEADER_ARTIFACT, model_version=99)
+        (tmp_path / "jpeg_header_v1.json").write_text(json.dumps(bad))
+        self._clear_cache()
+        import estimation.models as models_mod
+
+        monkeypatch.setattr(models_mod, "_MODELS_DIR", tmp_path)
+        load_jpeg_header_model.cache_clear()
+
+        result = load_jpeg_header_model()
         assert isinstance(result, LoadFailed)
         assert result.reason == "version_mismatch"
