@@ -240,12 +240,10 @@ class TestLoadPngModel:
     def test_does_not_raise_on_missing_artifact(self):
         """load_png_model() should return LoadFailed, not raise, when artifact is absent."""
         self._clear_cache()
-        # The real artifact png_v1.json does not exist yet (Phase 2 creates it).
-        # load_png_model() points at the models/ directory; as long as png_v1.json is absent,
-        # this test verifies the no-raise contract.
+        # The real png_v1.json is committed in this branch; this test loads it via the same
+        # code path production uses.  Whether the file is present (Loaded) or absent
+        # (LoadFailed), the key contract is: it never raises.
         result = load_png_model()
-        # We don't assert the exact type here because in CI the file might not exist
-        # (LoadFailed) or it might (Loaded). The key contract is: it never raises.
         assert isinstance(result, (Loaded, LoadFailed))
 
     def test_does_not_raise_when_called_multiple_times(self):

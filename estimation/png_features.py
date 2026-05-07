@@ -8,11 +8,9 @@ Caller contract
 ``extract_png_features()`` is a **synchronous** function.  Callers from async context
 must wrap it in ``asyncio.to_thread()`` per the project's async discipline.
 
-Phase 1 scope
--------------
-Only the feature extraction logic is implemented here.  The regression inference
-(loading ``PngModel``, applying ``StandardScaler``, evaluating piecewise-linear
-coefficients) is deferred to Phase 2 when ``estimation/estimator.py`` is wired.
+The regression inference (loading ``PngModel``, applying ``StandardScaler``, evaluating
+piecewise-linear coefficients) is implemented in ``estimation/estimator.py`` as
+``_png_fitted_bpp()``, which calls this module to obtain its feature vector.
 """
 
 from __future__ import annotations
@@ -121,8 +119,9 @@ def extract_png_features(
 
     Notes
     -----
-    - For palette images (mode ``P``) with a ``tRNS`` chunk, the color count is
-      ``palette_size + 1`` to account for the transparent pseudo-color.
+    - For palette mode (``P``) with ``tRNS``, the count is (unique colors observed in
+      the 64×64 thumbnail) + 1 — accounting for the transparent palette index
+      without requiring a full-image color enumeration.
     - The 64×64 thumbnail is computed with LANCZOS resampling for best quality
       at the small target size.
     - All NumPy work operates on contiguous arrays; no Python pixel loops.

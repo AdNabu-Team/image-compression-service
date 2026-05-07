@@ -58,7 +58,8 @@ class PngModel:
     Fields
     ------
     model_version : int
-        Schema version.  Must equal 1; any other value → ``LoadFailed("version_mismatch")``.
+        Schema version.  Must equal ``_SUPPORTED_MODEL_VERSION`` (currently 2);
+        any other value → ``LoadFailed("version_mismatch")``.
     format : str
         Always ``"png"`` for this class.
     features : list[str]
