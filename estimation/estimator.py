@@ -288,6 +288,11 @@ def _png_header_only_bpp_inner(
     import numpy as np
 
     original_pixels = header.width * header.height
+
+    # Pixel cap: reject images that would exceed the memory budget
+    if original_pixels > settings.max_image_pixels:
+        return HeaderOnlyFallback(reason="feature_oob")
+
     input_bpp = file_size * 8 / original_pixels if original_pixels > 0 else 0.0
 
     # Sanity: reject implausibly high input BPP
@@ -384,6 +389,11 @@ def _jpeg_header_only_bpp_inner(
         return HeaderOnlyFallback(reason="header_parse_error")
 
     original_pixels = header.width * header.height
+
+    # Pixel cap: reject images that would exceed the memory budget
+    if original_pixels > settings.max_image_pixels:
+        return HeaderOnlyFallback(reason="feature_oob")
+
     input_bpp = file_size * 8 / original_pixels if original_pixels > 0 else 0.0
 
     if input_bpp <= 0.0 or input_bpp > _JPEG_MAX_INPUT_BPP:

@@ -1483,3 +1483,57 @@ def test_png_fitted_bpp_inner_feature_index_valueerror(
     result = _png_fitted_bpp_inner(img, 100, 100, 60, orig_size=30000)
     assert isinstance(result, FittedFallback)
     assert result.reason == "model_load_failed"
+
+
+# ---------------------------------------------------------------------------
+# §28 Pixel cap: PNG header-only returns feature_oob when pixels exceed cap
+# ---------------------------------------------------------------------------
+
+
+def test_png_header_only_pixel_cap_falls_back(monkeypatch: pytest.MonkeyPatch) -> None:
+    """PNG header with width=20000, height=20000 (400 MP > 100 MP cap) → feature_oob."""
+    from estimation.estimator import HeaderOnlyFallback, _png_header_only_bpp_inner
+    from estimation.png_header import PngHeader
+
+    monkeypatch.setattr("estimation.estimator.settings.max_image_pixels", 100_000_000)
+
+    # 20000 × 20000 = 400 megapixels > 100 MP cap
+    header = PngHeader(
+        width=20_000, height=20_000, bit_depth=8, color_type=2, has_alpha=False, is_palette=False
+    )
+    # file_size large enough so input_bpp would be in normal range if pixels weren't capped
+    file_size = 20_000 * 20_000 * 3  # 3 bpp uncompressed ~ 1.2 GB (irrelevant — cap fires first)
+    result = _png_header_only_bpp_inner(header, file_size, 60)
+    assert isinstance(result, HeaderOnlyFallback)
+    assert result.reason == "feature_oob"
+
+
+# ---------------------------------------------------------------------------
+# §29 Pixel cap: JPEG header-only returns feature_oob when pixels exceed cap
+# ---------------------------------------------------------------------------
+
+
+def test_jpeg_header_only_pixel_cap_falls_back(monkeypatch: pytest.MonkeyPatch) -> None:
+    """JPEG header with width=20000, height=20000 (400 MP > 100 MP cap) → feature_oob."""
+    from estimation.estimator import HeaderOnlyFallback, _jpeg_header_only_bpp_inner
+    from estimation.jpeg_header import JpegHeader
+
+    monkeypatch.setattr("estimation.estimator.settings.max_image_pixels", 100_000_000)
+
+    # 20000 × 20000 = 400 megapixels > 100 MP cap
+    header = JpegHeader(
+        width=20_000,
+        height=20_000,
+        components=3,
+        bit_depth=8,
+        subsampling="4:2:0",
+        progressive=False,
+        dqt_luma=[16] * 64,
+        dqt_chroma=[17] * 64,
+        app14_color_transform=None,
+        fallback_reason=None,
+    )
+    file_size = 20_000 * 20_000 * 3  # large but irrelevant — pixel cap fires before input_bpp check
+    result = _jpeg_header_only_bpp_inner(header, file_size, 60, False)
+    assert isinstance(result, HeaderOnlyFallback)
+    assert result.reason == "feature_oob"
