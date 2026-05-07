@@ -402,7 +402,9 @@ async def _estimate_by_sample(
     # --- Fitted estimator path (PNG only, mode=active) ---
     strategy = _resolve_estimate_strategy(fmt)
     if strategy == "fitted" and fmt == ImageFormat.PNG:
-        fitted_result = _png_fitted_bpp(img, width, height, config.quality, file_size)
+        fitted_result = await asyncio.to_thread(
+            _png_fitted_bpp, img, width, height, config.quality, file_size
+        )
         match fitted_result:
             case FittedBpp(bpp=bpp):
                 estimated_size = min(int(bpp * original_pixels / 8), file_size)
