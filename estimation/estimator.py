@@ -19,8 +19,18 @@ from typing import Literal
 from PIL import Image
 
 from config import settings
-from estimation.models import Loaded, LoadFailed, load_png_model
+from estimation.jpeg_header import JpegHeader, estimate_source_quality_lsm, parse_jpeg_header
+from estimation.models import (
+    Loaded,
+    LoadedHeader,
+    LoadedJpeg,
+    LoadFailed,
+    load_jpeg_header_model,
+    load_png_header_model,
+    load_png_model,
+)
 from estimation.png_features import extract_png_features
+from estimation.png_header import PngHeader, parse_png_header
 from optimizers.png import LARGE_MP_THRESHOLD
 from optimizers.router import optimize_image
 from optimizers.utils import clamp_quality
@@ -56,14 +66,23 @@ class FittedFallback:
 
 
 def _resolve_estimate_strategy(fmt: ImageFormat) -> str:
-    """Return 'fitted' or 'sample'.
+    """Return the estimation strategy for *fmt*.
 
     Reads ``settings.fitted_estimator_mode`` at call time so that
     ``monkeypatch.setattr("estimation.estimator.settings.fitted_estimator_mode", ...)``
     in tests takes effect without reloading the module (consensus #10).
+
+    Strategies:
+    - ``"png_header_only"`` — header-only path (replaces "fitted" for PNG).
+    - ``"jpeg_header_only"`` — header-only path for JPEG.
+    - ``"sample"`` — legacy direct-encode-sample / generic-fallback path.
     """
-    if fmt == ImageFormat.PNG and settings.fitted_estimator_mode == "active":
-        return "fitted"
+    if settings.fitted_estimator_mode != "active":
+        return "sample"
+    if fmt == ImageFormat.PNG:
+        return "png_header_only"  # supersedes the old thumbnail-based "fitted" path
+    if fmt == ImageFormat.JPEG:
+        return "jpeg_header_only"
     return "sample"
 
 
@@ -75,6 +94,9 @@ def _png_fitted_bpp(
     orig_size: int = 0,
 ) -> FittedBpp | FittedFallback:
     """Apply the fitted PNG BPP model to *img*.
+
+    Superseded by ``_png_header_only_bpp`` when ``fitted_estimator_mode='active'``.
+    Kept for safety; will be removed in a follow-up if header-only is stable.
 
     Synchronous because feature extraction (PIL resize + scipy Sobel) is CPU-bound;
     callers in async context wrap this in ``asyncio.to_thread()`` per the project's
@@ -185,6 +207,375 @@ def _png_fitted_bpp_inner(
             return FittedFallback(reason="prediction_disagreement")
 
     return FittedBpp(bpp=predicted_bpp)
+
+
+# ---------------------------------------------------------------------------
+# Header-only inference result union
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class HeaderOnlyBpp:
+    """Header-only model predicted a BPP value successfully."""
+
+    bpp: float
+
+
+@dataclass(frozen=True, slots=True)
+class HeaderOnlyFallback:
+    """Header-only model could not predict; caller should fall back."""
+
+    reason: Literal[
+        "header_parse_error",
+        "feature_oob",
+        "prediction_oob",
+        "model_load_failed",
+        "internal_error",
+        # JPEG-specific:
+        "lossless_jpeg",
+        "non_standard_components",
+        "non_default_color_transform",
+        "missing_chroma_table",
+        "custom_quantization",
+    ]
+
+
+# Hard input-BPP caps — values above these indicate non-standard encodings.
+_PNG_MAX_INPUT_BPP = 64.0  # e.g. 16-bit RGBA theoretical max = 64 bpp
+_JPEG_MAX_INPUT_BPP = 24.0  # 8-bit YCbCr max
+
+
+def _min_ratio_for_quality(quality: int) -> float:
+    """Return the minimum plausible output/input BPP ratio for a given quality setting.
+
+    Mirrors the ratio gate used in ``_png_fitted_bpp_inner``; reused by both
+    PNG and JPEG header-only helpers.
+    """
+    if quality < 50:
+        return 0.05
+    elif quality < 70:
+        return 0.10
+    else:
+        return 0.40
+
+
+def _png_header_only_bpp(
+    header: PngHeader,
+    file_size: int,
+    quality: int,
+) -> HeaderOnlyBpp | HeaderOnlyFallback:
+    """Predict PNG output BPP from header + file size alone. No image decode.
+
+    Features: [has_alpha, quality, log10_orig_pixels, input_bpp]
+    Model: linear with q50 and q70 piecewise-linear knots.
+
+    Wraps the body in ``try/except`` returning HeaderOnlyFallback("internal_error")
+    so the caller never sees an exception.
+    """
+    try:
+        return _png_header_only_bpp_inner(header, file_size, quality)
+    except Exception as exc:
+        logger.warning("header-only png internal error: %s", exc, exc_info=True)
+        return HeaderOnlyFallback(reason="internal_error")
+
+
+def _png_header_only_bpp_inner(
+    header: PngHeader,
+    file_size: int,
+    quality: int,
+) -> HeaderOnlyBpp | HeaderOnlyFallback:
+    """Inner implementation — called by ``_png_header_only_bpp`` which wraps in try/except."""
+    import numpy as np
+
+    original_pixels = header.width * header.height
+    input_bpp = file_size * 8 / original_pixels if original_pixels > 0 else 0.0
+
+    # Sanity: reject implausibly high input BPP
+    if input_bpp <= 0.0 or input_bpp > _PNG_MAX_INPUT_BPP:
+        return HeaderOnlyFallback(reason="feature_oob")
+
+    # Load model (lru-cached, never raises)
+    match load_png_header_model():
+        case LoadedHeader(model=model):
+            pass
+        case LoadFailed():
+            return HeaderOnlyFallback(reason="model_load_failed")
+
+    has_alpha = float(header.has_alpha)
+    log10_orig_pixels = math.log10(original_pixels) if original_pixels > 0 else 0.0
+
+    # Build feature vector in model's declared order: [has_alpha, quality, log10_orig_pixels, input_bpp]
+    x_raw = np.array([has_alpha, float(quality), log10_orig_pixels, input_bpp], dtype=np.float64)
+
+    # Standardise
+    mean_ = np.array(model.scaler["mean"], dtype=np.float64)
+    scale_ = np.array(model.scaler["scale"], dtype=np.float64)
+    x_scaled = (x_raw - mean_) / scale_
+
+    # Piecewise-linear quality knots (on raw quality value)
+    knot_q50_val = max(0.0, float(quality) - model.knot_q50)
+    knot_q70_val = max(0.0, float(quality) - model.knot_q70)
+
+    # Predict: intercept + betas @ x_scaled + knot contributions
+    betas = np.array(model.coefficients["betas"], dtype=np.float64)
+    predicted_bpp = (
+        model.coefficients["intercept"]
+        + float(betas @ x_scaled)
+        + model.coefficients["knot_q50_beta"] * knot_q50_val
+        + model.coefficients["knot_q70_beta"] * knot_q70_val
+    )
+
+    # Post-prediction clip
+    if not math.isfinite(predicted_bpp) or predicted_bpp < 0.001 or predicted_bpp > 32.0:
+        return HeaderOnlyFallback(reason="prediction_oob")
+
+    # Content-aware ratio gate
+    min_ratio = _min_ratio_for_quality(quality)
+    ratio = predicted_bpp / input_bpp
+    if ratio < min_ratio or ratio > 1.10:
+        return HeaderOnlyFallback(reason="prediction_oob")
+
+    return HeaderOnlyBpp(bpp=predicted_bpp)
+
+
+def _jpeg_header_only_bpp(
+    header: JpegHeader,
+    file_size: int,
+    quality: int,
+    progressive_pref: bool,
+) -> HeaderOnlyBpp | HeaderOnlyFallback:
+    """Predict JPEG output BPP from header + file size alone. No image decode.
+
+    Features (13): target_quality, source_quality, nse, subsampling_444,
+    subsampling_422, subsampling_420, progressive, log10_orig_pixels, input_bpp,
+    mean_dqt_luma, std_dqt_luma, mean_dqt_chroma, std_dqt_chroma.
+
+    Calls ``estimate_source_quality_lsm`` to derive source_quality and NSE.
+    NSE < 0.85 → "custom_quantization" fallback.
+    Wraps in try/except returning HeaderOnlyFallback("internal_error").
+    """
+    try:
+        return _jpeg_header_only_bpp_inner(header, file_size, quality, progressive_pref)
+    except Exception as exc:
+        logger.warning("header-only jpeg internal error: %s", exc, exc_info=True)
+        return HeaderOnlyFallback(reason="internal_error")
+
+
+def _jpeg_header_only_bpp_inner(
+    header: JpegHeader,
+    file_size: int,
+    quality: int,
+    progressive_pref: bool,
+) -> HeaderOnlyBpp | HeaderOnlyFallback:
+    """Inner implementation — called by ``_jpeg_header_only_bpp`` which wraps in try/except."""
+    import numpy as np
+
+    # Route parser-flagged non-modelable conditions
+    if header.fallback_reason is not None:
+        reason = header.fallback_reason
+        valid_reasons = {
+            "lossless_jpeg",
+            "non_standard_components",
+            "non_default_color_transform",
+            "missing_chroma_table",
+        }
+        if reason in valid_reasons:
+            return HeaderOnlyFallback(reason=reason)  # type: ignore[arg-type]
+        return HeaderOnlyFallback(reason="header_parse_error")
+
+    original_pixels = header.width * header.height
+    input_bpp = file_size * 8 / original_pixels if original_pixels > 0 else 0.0
+
+    if input_bpp <= 0.0 or input_bpp > _JPEG_MAX_INPUT_BPP:
+        return HeaderOnlyFallback(reason="feature_oob")
+
+    # LSM source-quality estimation
+    if not header.dqt_luma or len(header.dqt_luma) != 64:
+        return HeaderOnlyFallback(reason="header_parse_error")
+
+    source_quality, nse = estimate_source_quality_lsm(header.dqt_luma, header.dqt_chroma)
+    if nse < 0.85:
+        return HeaderOnlyFallback(reason="custom_quantization")
+
+    # Load model
+    match load_jpeg_header_model():
+        case LoadedJpeg(model=model):
+            pass
+        case LoadFailed():
+            return HeaderOnlyFallback(reason="model_load_failed")
+
+    log10_orig_pixels = math.log10(original_pixels) if original_pixels > 0 else 0.0
+
+    # Subsampling one-hot
+    sub = header.subsampling
+    subsampling_444 = float(sub == "4:4:4")
+    subsampling_422 = float(sub == "4:2:2")
+    subsampling_420 = float(sub == "4:2:0")
+
+    # DQT stats
+    dqt_luma_arr = header.dqt_luma
+    mean_dqt_luma = sum(dqt_luma_arr) / len(dqt_luma_arr)
+    variance_luma = sum((v - mean_dqt_luma) ** 2 for v in dqt_luma_arr) / len(dqt_luma_arr)
+    std_dqt_luma = math.sqrt(variance_luma)
+
+    if header.dqt_chroma and len(header.dqt_chroma) == 64:
+        dqt_chroma_arr = header.dqt_chroma
+        mean_dqt_chroma = sum(dqt_chroma_arr) / len(dqt_chroma_arr)
+        variance_chroma = sum((v - mean_dqt_chroma) ** 2 for v in dqt_chroma_arr) / len(
+            dqt_chroma_arr
+        )
+        std_dqt_chroma = math.sqrt(variance_chroma)
+    else:
+        mean_dqt_chroma = 0.0
+        std_dqt_chroma = 0.0
+
+    # Build feature vector in model's declared order (13 features)
+    x_raw = np.array(
+        [
+            float(quality),  # target_quality
+            float(source_quality),  # source_quality
+            nse,  # nse
+            subsampling_444,
+            subsampling_422,
+            subsampling_420,
+            float(progressive_pref),  # progressive (target preference)
+            log10_orig_pixels,
+            input_bpp,
+            mean_dqt_luma,
+            std_dqt_luma,
+            mean_dqt_chroma,
+            std_dqt_chroma,
+        ],
+        dtype=np.float64,
+    )
+
+    # Standardise
+    mean_ = np.array(model.scaler["mean"], dtype=np.float64)
+    scale_ = np.array(model.scaler["scale"], dtype=np.float64)
+    x_scaled = (x_raw - mean_) / scale_
+
+    # Linear prediction (no knots for JPEG header model)
+    betas = np.array(model.coefficients["betas"], dtype=np.float64)
+    predicted_bpp = model.coefficients["intercept"] + float(betas @ x_scaled)
+
+    # Post-prediction clip
+    if not math.isfinite(predicted_bpp) or predicted_bpp < 0.001 or predicted_bpp > 32.0:
+        return HeaderOnlyFallback(reason="prediction_oob")
+
+    # Content-aware ratio gate
+    min_ratio = _min_ratio_for_quality(quality)
+    ratio = predicted_bpp / input_bpp
+    if ratio < min_ratio or ratio > 1.10:
+        return HeaderOnlyFallback(reason="prediction_oob")
+
+    return HeaderOnlyBpp(bpp=predicted_bpp)
+
+
+# ---------------------------------------------------------------------------
+# estimate_from_header_bytes — header-only result builder (URL + multipart)
+# ---------------------------------------------------------------------------
+
+
+async def estimate_from_header_bytes(
+    data: bytes,
+    total_size: int,
+    fmt: ImageFormat,
+    config: OptimizationConfig,
+) -> EstimateResponse | None:
+    """Run the header-only inference path and return an EstimateResponse.
+
+    Used by the router for both URL-mode (Range-fetch) and multipart short-circuit.
+    Returns ``None`` on any failure — caller falls through to full download / full
+    estimation.  Never raises.
+
+    Does NOT acquire the estimate semaphore (caller already did).
+    Does NOT validate file size against max_file_size_bytes (total_size from
+    Content-Range is trusted; worst case is a slightly-off prediction).
+    """
+    try:
+        if fmt == ImageFormat.PNG:
+            return await _estimate_from_png_header(data, total_size, config)
+        elif fmt == ImageFormat.JPEG:
+            return await _estimate_from_jpeg_header(data, total_size, config)
+    except Exception as exc:
+        logger.warning("estimate_from_header_bytes unexpected error: %s", exc, exc_info=True)
+    return None
+
+
+async def _estimate_from_png_header(
+    data: bytes,
+    total_size: int,
+    config: OptimizationConfig,
+) -> EstimateResponse | None:
+    """PNG header-only EstimateResponse builder. Returns None on any failure."""
+    header = parse_png_header(data)
+    if header is None:
+        return None
+
+    result = await asyncio.to_thread(_png_header_only_bpp, header, total_size, config.quality)
+    match result:
+        case HeaderOnlyBpp(bpp=bpp):
+            original_pixels = header.width * header.height
+            estimated_size = min(int(bpp * original_pixels / 8), total_size)
+            reduction = max(0.0, round((total_size - estimated_size) / total_size * 100, 1))
+            has_alpha = header.has_alpha
+            color_type = "rgba" if has_alpha else "rgb"
+            return _build_estimate(
+                file_size=total_size,
+                fmt=ImageFormat.PNG,
+                width=header.width,
+                height=header.height,
+                color_type=color_type,
+                bit_depth=header.bit_depth,
+                estimated_size=estimated_size,
+                reduction=reduction,
+                method="png_header_only",
+                confidence="medium",
+                path="png_header_only",
+                fallback_reason=None,
+            )
+        case HeaderOnlyFallback():
+            return None
+
+
+async def _estimate_from_jpeg_header(
+    data: bytes,
+    total_size: int,
+    config: OptimizationConfig,
+) -> EstimateResponse | None:
+    """JPEG header-only EstimateResponse builder. Returns None on any failure."""
+    header = parse_jpeg_header(data)
+    if header is None:
+        return None
+
+    if header.fallback_reason is not None:
+        return None
+
+    result = await asyncio.to_thread(
+        _jpeg_header_only_bpp, header, total_size, config.quality, config.progressive_jpeg
+    )
+    match result:
+        case HeaderOnlyBpp(bpp=bpp):
+            original_pixels = header.width * header.height
+            estimated_size = min(int(bpp * original_pixels / 8), total_size)
+            reduction = max(0.0, round((total_size - estimated_size) / total_size * 100, 1))
+            color_type = "rgb" if header.components == 3 else "grayscale"
+            return _build_estimate(
+                file_size=total_size,
+                fmt=ImageFormat.JPEG,
+                width=header.width,
+                height=header.height,
+                color_type=color_type,
+                bit_depth=header.bit_depth,
+                estimated_size=estimated_size,
+                reduction=reduction,
+                method="jpeg_header_only",
+                confidence="medium",
+                path="jpeg_header_only",
+                fallback_reason=None,
+            )
+        case HeaderOnlyFallback():
+            return None
 
 
 # Register optional Pillow format plugins so Image.open() can identify all formats.
@@ -399,52 +790,131 @@ async def _estimate_by_sample(
     sample_height = max(1, int(height * ratio))
     sample_pixels = sample_width * sample_height
 
-    # --- Fitted estimator path (PNG only, mode=active) ---
+    # --- Header-only estimator path (PNG/JPEG, mode=active) ---
     strategy = _resolve_estimate_strategy(fmt)
-    if strategy == "fitted" and fmt == ImageFormat.PNG:
-        fitted_result = await asyncio.to_thread(
-            _png_fitted_bpp, img, width, height, config.quality, file_size
-        )
-        match fitted_result:
-            case FittedBpp(bpp=bpp):
-                estimated_size = min(int(bpp * original_pixels / 8), file_size)
-                reduction = max(0.0, round((file_size - estimated_size) / file_size * 100, 1))
-                return _build_estimate(
-                    file_size,
-                    fmt,
-                    width,
-                    height,
-                    color_type,
-                    bit_depth,
-                    estimated_size,
-                    reduction,
-                    "png_fitted_curve",
-                    confidence="medium",
-                    path="png_fitted_curve",
-                    fallback_reason=None,
-                )
-            case FittedFallback(reason=reason):
-                logger.info(
-                    "png fitted estimator fell back: %s — using direct_encode_sample", reason
-                )
-                # Fall through to direct_encode_sample with fallback_reason populated
-                bpp_fn = _DIRECT_ENCODE_BPP_FNS.get(fmt)
-                if bpp_fn is not None:
-                    return await _bpp_to_estimate(
-                        bpp_fn,
-                        img,
-                        sample_width,
-                        sample_height,
-                        config,
-                        original_pixels,
+
+    if strategy == "png_header_only" and fmt == ImageFormat.PNG:
+        # Parse header from raw bytes (data already loaded by caller)
+        try:
+            png_header = parse_png_header(data)
+        except Exception as exc:
+            logger.warning("png header-only: parse_png_header raised: %s", exc, exc_info=True)
+            png_header = None
+        if png_header is None:
+            fallback_reason_val = "header_parse_error"
+            logger.info("png header-only: parse failed — using direct_encode_sample")
+        else:
+            ho_result = await asyncio.to_thread(
+                _png_header_only_bpp, png_header, file_size, config.quality
+            )
+            match ho_result:
+                case HeaderOnlyBpp(bpp=bpp):
+                    estimated_size = min(int(bpp * original_pixels / 8), file_size)
+                    reduction = max(0.0, round((file_size - estimated_size) / file_size * 100, 1))
+                    return _build_estimate(
                         file_size,
                         fmt,
                         width,
                         height,
                         color_type,
                         bit_depth,
-                        fallback_reason=reason,
+                        estimated_size,
+                        reduction,
+                        "png_header_only",
+                        confidence="medium",
+                        path="png_header_only",
+                        fallback_reason=None,
                     )
+                case HeaderOnlyFallback(reason=reason):
+                    fallback_reason_val = reason
+                    logger.info(
+                        "png header-only fell back: %s — using direct_encode_sample", reason
+                    )
+
+        # Fall through to direct_encode_sample with fallback_reason populated
+        bpp_fn = _DIRECT_ENCODE_BPP_FNS.get(fmt)
+        if bpp_fn is not None:
+            return await _bpp_to_estimate(
+                bpp_fn,
+                img,
+                sample_width,
+                sample_height,
+                config,
+                original_pixels,
+                file_size,
+                fmt,
+                width,
+                height,
+                color_type,
+                bit_depth,
+                fallback_reason=fallback_reason_val,
+            )
+
+    elif strategy == "jpeg_header_only" and fmt == ImageFormat.JPEG:
+        try:
+            jpeg_header = parse_jpeg_header(data)
+        except Exception as exc:
+            logger.warning("jpeg header-only: parse_jpeg_header raised: %s", exc, exc_info=True)
+            jpeg_header = None
+        if jpeg_header is None:
+            fallback_reason_val = "header_parse_error"
+            logger.info("jpeg header-only: parse failed — using direct_encode_sample")
+        elif jpeg_header.fallback_reason is not None:
+            fallback_reason_val = jpeg_header.fallback_reason
+            logger.info(
+                "jpeg header-only: parser flagged %s — using direct_encode_sample",
+                fallback_reason_val,
+            )
+        else:
+            ho_result = await asyncio.to_thread(
+                _jpeg_header_only_bpp,
+                jpeg_header,
+                file_size,
+                config.quality,
+                config.progressive_jpeg,
+            )
+            match ho_result:
+                case HeaderOnlyBpp(bpp=bpp):
+                    estimated_size = min(int(bpp * original_pixels / 8), file_size)
+                    reduction = max(0.0, round((file_size - estimated_size) / file_size * 100, 1))
+                    return _build_estimate(
+                        file_size,
+                        fmt,
+                        width,
+                        height,
+                        color_type,
+                        bit_depth,
+                        estimated_size,
+                        reduction,
+                        "jpeg_header_only",
+                        confidence="medium",
+                        path="jpeg_header_only",
+                        fallback_reason=None,
+                    )
+                case HeaderOnlyFallback(reason=reason):
+                    fallback_reason_val = reason
+                    logger.info(
+                        "jpeg header-only fell back: %s — using direct_encode_sample", reason
+                    )
+
+        # Fall through to direct_encode_sample
+        bpp_fn = _DIRECT_ENCODE_BPP_FNS.get(fmt)
+        if bpp_fn is not None:
+            return await _bpp_to_estimate(
+                bpp_fn,
+                img,
+                sample_width,
+                sample_height,
+                config,
+                original_pixels,
+                file_size,
+                fmt,
+                width,
+                height,
+                color_type,
+                bit_depth,
+                fallback_reason=fallback_reason_val,
+            )
 
     bpp_fn = _DIRECT_ENCODE_BPP_FNS.get(fmt)
     if bpp_fn is not None:

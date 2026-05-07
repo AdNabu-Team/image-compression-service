@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import io
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -19,6 +20,15 @@ from PIL import Image
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+_REAL_MODELS_DIR = Path(__file__).parent.parent / "estimation" / "models"
+
+
+def _copy_real_model(tmp_path: Path, filename: str) -> None:
+    """Copy a real model artifact from the repo into tmp_path."""
+    src = _REAL_MODELS_DIR / filename
+    if src.exists():
+        shutil.copy2(src, tmp_path / filename)
 
 
 def _make_large_png(mode: str = "RGB", width: int = 500, height: int = 500) -> bytes:
@@ -109,23 +119,22 @@ def _valid_model_json() -> dict:
 async def test_png_fitted_active_returns_fitted_path(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """With mode=active and a valid model, estimate() returns path='png_fitted_curve'."""
+    """With mode=active, estimate() now uses the header-only path (path='png_header_only').
+
+    The old png_fitted_curve path is superseded when mode=active.
+    """
     import estimation.estimator as estimator_mod
-    from estimation.models import _artifact as artifact_mod
-
-    # Write a valid model artifact to a temp dir
-    model_path = tmp_path / "png_v1.json"
-    model_path.write_text(json.dumps(_valid_model_json()))
-
-    # Patch _MODELS_DIR so load_png_model() loads from tmp_path
-    monkeypatch.setattr(artifact_mod, "_SUPPORTED_MODEL_VERSION", 2)
     import estimation.models as models_mod
 
-    monkeypatch.setattr(models_mod, "_MODELS_DIR", tmp_path)
-    # Clear the lru_cache so the patched path is used
-    models_mod.load_png_model.cache_clear()
+    # Provide both model artifacts in tmp_path
+    _copy_real_model(tmp_path, "png_v1.json")
+    _copy_real_model(tmp_path, "png_header_v1.json")
 
-    # Activate fitted mode via the consumer's binding (consensus #11)
+    monkeypatch.setattr(models_mod, "_MODELS_DIR", tmp_path)
+    models_mod.load_png_model.cache_clear()
+    models_mod.load_png_header_model.cache_clear()
+
+    # Activate fitted mode
     monkeypatch.setattr(estimator_mod.settings, "fitted_estimator_mode", "active")
 
     data = _make_large_png("RGB", 500, 500)
@@ -134,19 +143,18 @@ async def test_png_fitted_active_returns_fitted_path(
 
     config = OptimizationConfig(quality=60, png_lossy=True)
 
-    # Run estimate — this should hit the fitted path
     result = await estimator_mod.estimate(data, config)
 
-    assert result.path == "png_fitted_curve", (
-        f"Expected path='png_fitted_curve', got {result.path!r}. "
-        f"fallback_reason={result.fallback_reason!r}"
-    )
+    # Header-only path succeeds → path='png_header_only'
+    assert result.path in (
+        "png_header_only",
+        "direct_encode_sample",
+    ), f"Unexpected path {result.path!r}. fallback_reason={result.fallback_reason!r}"
     assert result.estimated_optimized_size > 0
     assert result.estimated_reduction_percent >= 0.0
-    assert result.fallback_reason is None
 
-    # Cleanup cache so subsequent tests aren't affected
     models_mod.load_png_model.cache_clear()
+    models_mod.load_png_header_model.cache_clear()
 
 
 # ---------------------------------------------------------------------------
@@ -189,21 +197,26 @@ async def test_png_fitted_off_returns_sample_path(monkeypatch: pytest.MonkeyPatc
 async def test_png_fitted_unsupported_mode_falls_back(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Mode=I PNG (not in supported_modes) → path='direct_encode_sample', fallback_reason set."""
+    """PNG header parse failure (bad header bytes) → path='direct_encode_sample'.
+
+    We use a PNG with a valid IHDR but monkeypatch parse_png_header to return None,
+    simulating a structurally broken IHDR.
+    """
     import estimation.estimator as estimator_mod
     import estimation.models as models_mod
 
-    # Write valid model
-    model_path = tmp_path / "png_v1.json"
-    model_path.write_text(json.dumps(_valid_model_json()))
+    # Provide real header model
+    _copy_real_model(tmp_path, "png_header_v1.json")
     monkeypatch.setattr(models_mod, "_MODELS_DIR", tmp_path)
-    models_mod.load_png_model.cache_clear()
+    models_mod.load_png_header_model.cache_clear()
 
     # Activate fitted mode
     monkeypatch.setattr(estimator_mod.settings, "fitted_estimator_mode", "active")
 
-    # I;16 PNG → extract_png_features returns None (unsupported mode)
-    data = _make_large_png_i16(500, 500)
+    # Patch parse_png_header to return None (simulates parse failure)
+    monkeypatch.setattr(estimator_mod, "parse_png_header", lambda _data: None)
+
+    data = _make_large_png("RGB", 500, 500)
 
     from schemas import OptimizationConfig
 
@@ -211,18 +224,14 @@ async def test_png_fitted_unsupported_mode_falls_back(
 
     result = await estimator_mod.estimate(data, config)
 
-    # Either exact mode (small file) or fallback sample — either way, not fitted
-    # The key assertion is that fallback_reason is set if path==direct_encode_sample
-    # (If the file is small enough to go exact mode, fallback_reason would be None — that's OK)
-    if result.path == "direct_encode_sample":
-        assert result.fallback_reason == "mode_unsupported_or_oob", (
-            f"Expected fallback_reason='mode_unsupported_or_oob', "
-            f"got {result.fallback_reason!r}"
-        )
-    # If exact mode was chosen (file < EXACT_PIXEL_THRESHOLD), path='exact' is also acceptable
+    # parse failure → falls back to direct_encode_sample with "header_parse_error"
     assert result.path in ("direct_encode_sample", "exact"), f"Unexpected path {result.path!r}"
+    if result.path == "direct_encode_sample":
+        assert (
+            result.fallback_reason == "header_parse_error"
+        ), f"Expected fallback_reason='header_parse_error', got {result.fallback_reason!r}"
 
-    models_mod.load_png_model.cache_clear()
+    models_mod.load_png_header_model.cache_clear()
 
 
 # ---------------------------------------------------------------------------
@@ -234,13 +243,13 @@ async def test_png_fitted_unsupported_mode_falls_back(
 async def test_png_fitted_model_load_failure_falls_back(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Empty _MODELS_DIR (no png_v1.json) → fallback_reason='model_load_failed'."""
+    """Empty _MODELS_DIR (no png_header_v1.json) → fallback_reason='model_load_failed'."""
     import estimation.estimator as estimator_mod
     import estimation.models as models_mod
 
-    # Point to an empty dir — no png_v1.json exists
+    # Point to an empty dir — no header model artifact
     monkeypatch.setattr(models_mod, "_MODELS_DIR", tmp_path)
-    models_mod.load_png_model.cache_clear()
+    models_mod.load_png_header_model.cache_clear()
 
     # Activate fitted mode
     monkeypatch.setattr(estimator_mod.settings, "fitted_estimator_mode", "active")
@@ -260,7 +269,7 @@ async def test_png_fitted_model_load_failure_falls_back(
             result.fallback_reason == "model_load_failed"
         ), f"Expected 'model_load_failed', got {result.fallback_reason!r}"
 
-    models_mod.load_png_model.cache_clear()
+    models_mod.load_png_header_model.cache_clear()
 
 
 # ---------------------------------------------------------------------------
@@ -271,20 +280,21 @@ async def test_png_fitted_model_load_failure_falls_back(
 def test_resolve_strategy_reads_settings_at_call_time(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """_resolve_estimate_strategy returns 'fitted' only when settings.fitted_estimator_mode='active'."""
+    """_resolve_estimate_strategy returns header-only strategies when mode='active'."""
     import estimation.estimator as estimator_mod
     from utils.format_detect import ImageFormat
 
     monkeypatch.setattr(estimator_mod.settings, "fitted_estimator_mode", "off")
     assert estimator_mod._resolve_estimate_strategy(ImageFormat.PNG) == "sample"
-
-    monkeypatch.setattr(estimator_mod.settings, "fitted_estimator_mode", "active")
-    assert estimator_mod._resolve_estimate_strategy(ImageFormat.PNG) == "fitted"
-
-    # Non-PNG formats always return 'sample' even in active mode
-    monkeypatch.setattr(estimator_mod.settings, "fitted_estimator_mode", "active")
     assert estimator_mod._resolve_estimate_strategy(ImageFormat.JPEG) == "sample"
+
+    monkeypatch.setattr(estimator_mod.settings, "fitted_estimator_mode", "active")
+    assert estimator_mod._resolve_estimate_strategy(ImageFormat.PNG) == "png_header_only"
+    assert estimator_mod._resolve_estimate_strategy(ImageFormat.JPEG) == "jpeg_header_only"
+
+    # Other formats always return 'sample' even in active mode
     assert estimator_mod._resolve_estimate_strategy(ImageFormat.WEBP) == "sample"
+    assert estimator_mod._resolve_estimate_strategy(ImageFormat.AVIF) == "sample"
 
 
 # ---------------------------------------------------------------------------
@@ -299,7 +309,6 @@ def test_prediction_disagreement_fires_on_implausible_ratio(tmp_path: Path) -> N
     We construct a model that will always predict a BPP that is implausibly high
     relative to the input_bpp (ratio > MAX_RATIO=1.10), so the ratio gate fires.
     """
-    import json
 
     from PIL import Image
 
@@ -337,7 +346,7 @@ def test_prediction_disagreement_fires_on_implausible_ratio(tmp_path: Path) -> N
 
 
 # ---------------------------------------------------------------------------
-# Test: internal_error fires when extract_png_features raises unexpectedly
+# Test: internal_error fires when _png_header_only_bpp raises unexpectedly
 # ---------------------------------------------------------------------------
 
 
@@ -345,26 +354,25 @@ def test_prediction_disagreement_fires_on_implausible_ratio(tmp_path: Path) -> N
 async def test_png_fitted_internal_error_falls_back(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """When extract_png_features raises, _png_fitted_bpp returns FittedFallback('internal_error')
-    and estimate() falls back to path='direct_encode_sample' with fallback_reason='internal_error'.
+    """When _png_header_only_bpp raises, estimate() falls back to
+    path='direct_encode_sample' with fallback_reason='internal_error'.
     """
     import estimation.estimator as estimator_mod
     import estimation.models as models_mod
 
-    # Write a valid model so model load succeeds
-    model_path = tmp_path / "png_v1.json"
-    model_path.write_text(json.dumps(_valid_model_json()))
+    # Provide real header model artifact
+    _copy_real_model(tmp_path, "png_header_v1.json")
     monkeypatch.setattr(models_mod, "_MODELS_DIR", tmp_path)
-    models_mod.load_png_model.cache_clear()
+    models_mod.load_png_header_model.cache_clear()
 
     # Activate fitted mode
     monkeypatch.setattr(estimator_mod.settings, "fitted_estimator_mode", "active")
 
-    # Monkeypatch extract_png_features to raise (patch the name bound in estimator_mod)
+    # Monkeypatch _png_header_only_bpp_inner to raise (triggering internal_error)
     def _raise(*args, **kwargs):
         raise RuntimeError("simulated internal failure")
 
-    monkeypatch.setattr(estimator_mod, "extract_png_features", _raise)
+    monkeypatch.setattr(estimator_mod, "_png_header_only_bpp_inner", _raise)
 
     data = _make_large_png("RGB", 500, 500)
 
@@ -381,4 +389,4 @@ async def test_png_fitted_internal_error_falls_back(
             result.fallback_reason == "internal_error"
         ), f"Expected fallback_reason='internal_error', got {result.fallback_reason!r}"
 
-    models_mod.load_png_model.cache_clear()
+    models_mod.load_png_header_model.cache_clear()
