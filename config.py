@@ -59,7 +59,13 @@ class Settings(BaseSettings):
     header_only_min_size_bytes: int = 1_048_576  # 1 MB
     """Minimum file size for the header-only Range-fetch path. Smaller files round-trip
     the Range request in similar time to a full small download, so we just download.
-    Used by routers/estimate.py URL-mode dispatch (Phase 2 — not wired yet)."""
+    Used by routers/estimate.py URL-mode dispatch."""
+
+    large_file_threshold_bytes: int = 1 * 1024 * 1024  # 1 MB; was 10 MB hardcoded
+    """Threshold above which the legacy thumbnail_url fast path activates.
+    Lowered from 10 MB to 1 MB. The header-only path (when enabled) supersedes
+    this for most cases, but the thumbnail_url path remains useful when callers
+    have a real source thumbnail of their own."""
 
     # --- Logging ---
     log_level: str = "ERROR"
