@@ -25,7 +25,7 @@ logger = logging.getLogger("pare.estimation.models")
 
 # The only model_version this code understands.  Artifacts with a different version are
 # rejected at load time so stale JSON from a previous fit does not silently corrupt predictions.
-_SUPPORTED_MODEL_VERSION = 1
+_SUPPORTED_MODEL_VERSION = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,6 +90,8 @@ class PngModel:
     scaler: dict[str, list[float]]
     coefficients: dict[str, Any]
     knot_log10_unique_colors: float
+    knot_q50: float
+    knot_q70: float
     training_envelope: dict[str, list[float]]
     training_corpus_sha256: str
     git_sha: str
@@ -143,6 +145,8 @@ class PngModel:
                 scaler=dict(raw["scaler"]),
                 coefficients=dict(raw["coefficients"]),
                 knot_log10_unique_colors=float(raw["knot_log10_unique_colors"]),
+                knot_q50=float(raw["knot_q50"]),
+                knot_q70=float(raw["knot_q70"]),
                 training_envelope=dict(raw.get("training_envelope") or {}),
                 training_corpus_sha256=str(raw["training_corpus_sha256"]),
                 git_sha=str(raw["git_sha"]),

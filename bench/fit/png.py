@@ -172,8 +172,10 @@ async def _run_cases(
 
             actual_bpp = actual_size * 8 / orig_pixels
 
-            # Extract features
-            features = await asyncio.to_thread(extract_png_features, img, width, height, quality)
+            # Extract features (pass file_size for input_bpp computation)
+            features = await asyncio.to_thread(
+                extract_png_features, img, width, height, quality, file_size
+            )
             if features is None:
                 logger.info("features=None for %s q=%d — skipping", entry.name, quality)
                 skipped += 1
@@ -193,6 +195,7 @@ async def _run_cases(
                     "edge_density": features.edge_density,
                     "quality_feat": float(features.quality),
                     "log10_orig_pixels": features.log10_orig_pixels,
+                    "input_bpp": features.input_bpp,
                 }
             )
 
@@ -278,6 +281,7 @@ def main() -> int:
         "edge_density",
         "quality_feat",
         "log10_orig_pixels",
+        "input_bpp",
     ]
     # Rename quality_feat → quality for the model artifact (matches PngFeatures field name)
     feature_names = [
@@ -287,29 +291,32 @@ def main() -> int:
         "edge_density",
         "quality",
         "log10_orig_pixels",
+        "input_bpp",
     ]
 
     features_df = df[feature_cols].copy()
     features_df.columns = feature_names  # type: ignore[assignment]
     targets = df["actual_bpp"].values
 
-    # Fit
+    # Fit (three knots: log10_unique_colors at 3.3, quality at 50 and 70)
     from bench.fit.common import train_one
 
-    result = train_one(features_df, targets, knot=3.3)
+    result = train_one(features_df, targets, knot=3.3, knot_q50=50.0, knot_q70=70.0)
 
     # Training envelope (forensic)
     training_envelope = _build_training_envelope(features_df, feature_names)
 
-    # Build model artifact JSON
+    # Build model artifact JSON (model_version=2 — schema changed: added input_bpp + quality knots)
     artifact = {
-        "model_version": 1,
+        "model_version": 2,
         "format": "png",
         "features": feature_names,
         "supported_modes": ["RGB", "RGBA", "L", "LA", "P"],
         "scaler": result["scaler"],
         "coefficients": result["coefficients"],
         "knot_log10_unique_colors": result["knot_log10_unique_colors"],
+        "knot_q50": result["knot_q50"],
+        "knot_q70": result["knot_q70"],
         "training_envelope": training_envelope,
         "training_corpus_sha256": manifest_sha,
         "git_sha": _git_sha(),

@@ -39,6 +39,7 @@ _THUMBNAIL_SIZE: int = 64
 # Hard clips (spec §4).  Out-of-bounds → return None (caller routes to fallback).
 MAX_UNIQUE_COLORS: int = 500_000
 MAX_PIXELS: int = 100_000_000
+MAX_INPUT_BPP: float = 64.0  # clearly above any real 8-bit RGBA (max = 32.0)
 
 # Sobel magnitude threshold for edge_density classification (spec §4).
 _SOBEL_EDGE_THRESHOLD: float = 32.0
@@ -72,6 +73,11 @@ class PngFeatures:
     log10_orig_pixels : float
         ``log10(orig_w * orig_h)`` — the full-resolution pixel count, log-scaled.
         Clipped at ``log10(MAX_PIXELS)`` before the regression.
+    input_bpp : float
+        Input file size in bits-per-pixel: ``(orig_size * 8) / (orig_w * orig_h)``.
+        Captures how heavily the source was already compressed before optimization.
+        High-BPP inputs (raw/lossless PNGs) compress much more than low-BPP ones.
+        Clipped at ``MAX_INPUT_BPP`` before the regression.
     """
 
     has_alpha: bool
@@ -80,6 +86,7 @@ class PngFeatures:
     edge_density: float
     quality: int
     log10_orig_pixels: float
+    input_bpp: float
 
 
 def extract_png_features(
@@ -87,6 +94,7 @@ def extract_png_features(
     orig_w: int,
     orig_h: int,
     quality: int,
+    orig_size: int = 0,
 ) -> PngFeatures | None:
     """Extract regression features from a decoded PNG image.
 
@@ -100,12 +108,16 @@ def extract_png_features(
         If ``orig_w * orig_h`` exceeds ``MAX_PIXELS``, returns ``None``.
     quality :
         Requested optimization quality (1–100), passed through as a feature.
+    orig_size :
+        Original file size in bytes.  Used to compute ``input_bpp``.  Pass 0 to
+        disable the ``input_bpp`` clip check (feature will be 0.0, which the model
+        was not trained on — callers should always pass the real size).
 
     Returns
     -------
     PngFeatures
-        Extracted feature vector, or ``None`` if the image is unsupported or
-        pixel count exceeds the hard clip.
+        Extracted feature vector, or ``None`` if the image is unsupported,
+        pixel count exceeds the hard clip, or ``input_bpp`` exceeds ``MAX_INPUT_BPP``.
 
     Notes
     -----
@@ -188,6 +200,16 @@ def extract_png_features(
     # --- log10_orig_pixels ---
     log10_orig_pixels = math.log10(max(orig_pixels, 1))
 
+    # --- input_bpp ---
+    # Bits-per-pixel of the *input* file (not the decoded image).
+    # High-BPP sources (raw/lossless PNGs) compress much more than low-BPP ones.
+    if orig_size > 0:
+        input_bpp = (orig_size * 8) / orig_pixels
+        if input_bpp > MAX_INPUT_BPP:
+            return None  # feature_oob — clearly above any real 8-bit RGBA
+    else:
+        input_bpp = 0.0  # caller did not provide size; feature disabled
+
     return PngFeatures(
         has_alpha=has_alpha,
         log10_unique_colors=log10_unique_colors,
@@ -195,4 +217,5 @@ def extract_png_features(
         edge_density=edge_density,
         quality=quality,
         log10_orig_pixels=log10_orig_pixels,
+        input_bpp=input_bpp,
     )

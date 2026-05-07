@@ -54,9 +54,9 @@ def _make_large_png_i16(width: int = 500, height: int = 500) -> bytes:
 
 
 def _valid_model_json() -> dict:
-    """Minimal valid png_v1.json that passes PngModel.from_json."""
+    """Minimal valid png_v1.json that passes PngModel.from_json (model_version=2)."""
     return {
-        "model_version": 1,
+        "model_version": 2,
         "format": "png",
         "features": [
             "has_alpha",
@@ -65,18 +65,25 @@ def _valid_model_json() -> dict:
             "edge_density",
             "quality",
             "log10_orig_pixels",
+            "input_bpp",
         ],
         "supported_modes": ["RGB", "RGBA", "L", "LA", "P"],
         "scaler": {
-            "mean": [0.0, 3.0, 50.0, 0.3, 60.0, 5.5],
-            "scale": [1.0, 0.5, 30.0, 0.2, 15.0, 1.0],
+            "mean": [0.0, 3.0, 50.0, 0.3, 60.0, 5.5, 8.0],
+            "scale": [1.0, 0.5, 30.0, 0.2, 15.0, 1.0, 4.0],
         },
         "coefficients": {
-            "intercept": 2.0,
-            "betas": [0.0, 0.5, 0.3, -0.5, 0.1, -0.2],
+            # intercept=12.0 → predicted_bpp ≈ 12.0 for a noisy 500×500 PNG
+            # (input_bpp ≈ 24 → ratio ≈ 0.5, well above min_ratio=0.10 for q=60)
+            "intercept": 12.0,
+            "betas": [0.0, 0.5, 0.3, -0.5, 0.1, -0.2, -0.3],
             "knot_beta": 0.5,
+            "knot_q50_beta": -0.02,
+            "knot_q70_beta": 0.03,
         },
         "knot_log10_unique_colors": 3.3,
+        "knot_q50": 50.0,
+        "knot_q70": 70.0,
         "training_envelope": {
             "has_alpha": [0.0, 1.0],
             "log10_unique_colors": [1.0, 5.0],
@@ -84,6 +91,7 @@ def _valid_model_json() -> dict:
             "edge_density": [0.0, 1.0],
             "quality": [40.0, 85.0],
             "log10_orig_pixels": [3.0, 8.0],
+            "input_bpp": [1.0, 32.0],
         },
         "training_corpus_sha256": "abc123",
         "git_sha": "deadbeef",
@@ -110,7 +118,7 @@ async def test_png_fitted_active_returns_fitted_path(
     model_path.write_text(json.dumps(_valid_model_json()))
 
     # Patch _MODELS_DIR so load_png_model() loads from tmp_path
-    monkeypatch.setattr(artifact_mod, "_SUPPORTED_MODEL_VERSION", 1)
+    monkeypatch.setattr(artifact_mod, "_SUPPORTED_MODEL_VERSION", 2)
     import estimation.models as models_mod
 
     monkeypatch.setattr(models_mod, "_MODELS_DIR", tmp_path)
@@ -277,3 +285,52 @@ def test_resolve_strategy_reads_settings_at_call_time(
     monkeypatch.setattr(estimator_mod.settings, "fitted_estimator_mode", "active")
     assert estimator_mod._resolve_estimate_strategy(ImageFormat.JPEG) == "sample"
     assert estimator_mod._resolve_estimate_strategy(ImageFormat.WEBP) == "sample"
+
+
+# ---------------------------------------------------------------------------
+# Test: prediction_disagreement fires when ratio is implausible
+# ---------------------------------------------------------------------------
+
+
+def test_prediction_disagreement_fires_on_implausible_ratio(tmp_path: Path) -> None:
+    """_png_fitted_bpp returns FittedFallback(reason='prediction_disagreement') when
+    the model predicts a compression ratio that is outside the content-aware bounds.
+
+    We construct a model that will always predict a BPP that is implausibly high
+    relative to the input_bpp (ratio > MAX_RATIO=1.10), so the ratio gate fires.
+    """
+    import json
+
+    from PIL import Image
+
+    import estimation.models as models_mod
+    from estimation.estimator import FittedFallback, _png_fitted_bpp
+
+    # Write a model that predicts a very high BPP (intercept=30, all betas=0)
+    # so that predicted_bpp ≈ 30 >> input_bpp * 1.10 → ratio > MAX_RATIO
+    high_bpp_model = _valid_model_json()
+    high_bpp_model["coefficients"]["intercept"] = 30.0
+    high_bpp_model["coefficients"]["betas"] = [0.0] * 7
+    high_bpp_model["coefficients"]["knot_beta"] = 0.0
+    high_bpp_model["coefficients"]["knot_q50_beta"] = 0.0
+    high_bpp_model["coefficients"]["knot_q70_beta"] = 0.0
+
+    model_path = tmp_path / "png_v1.json"
+    model_path.write_text(json.dumps(high_bpp_model))
+    models_mod._MODELS_DIR = tmp_path
+    models_mod.load_png_model.cache_clear()
+
+    # Create a small photographic-like RGB image; provide a realistic orig_size
+    # (input_bpp ≈ 8 bpp = 8 bits/pixel for lossless PNG of 32×32 = 1024px at 1024 bytes)
+    img = Image.new("RGB", (32, 32), color=(100, 150, 200))
+    orig_size = 1024  # 1024 bytes × 8 bits = 8192 bits / 1024 pixels = 8.0 bpp
+
+    result = _png_fitted_bpp(img, 32, 32, quality=60, orig_size=orig_size)
+
+    assert isinstance(result, FittedFallback), f"Expected FittedFallback, got {result!r}"
+    assert (
+        result.reason == "prediction_disagreement"
+    ), f"Expected 'prediction_disagreement', got {result.reason!r}"
+
+    models_mod.load_png_model.cache_clear()
+    models_mod._MODELS_DIR = Path(__file__).parent.parent / "estimation" / "models"

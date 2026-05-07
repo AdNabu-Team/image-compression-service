@@ -15,6 +15,7 @@ import pytest
 from PIL import Image
 
 from estimation.png_features import (
+    MAX_INPUT_BPP,
     PngFeatures,
     extract_png_features,
 )
@@ -73,6 +74,15 @@ class TestHappyPathModes:
         assert feat.has_alpha is False
         assert feat.quality == 80
         assert feat.log10_orig_pixels > 0
+        # input_bpp defaults to 0.0 when orig_size not provided
+        assert feat.input_bpp == 0.0
+
+    def test_rgb_with_orig_size(self):
+        img = _make_rgb()
+        # 32*32 = 1024 pixels; 1024 bytes → input_bpp = 8.0
+        feat = extract_png_features(img, 32, 32, quality=80, orig_size=1024)
+        assert feat is not None
+        assert abs(feat.input_bpp - 8.0) < 1e-9
 
     def test_rgba_has_alpha(self):
         img = _make_rgba()
@@ -184,6 +194,24 @@ class TestPixelBounds:
         result = extract_png_features(img, w, h, quality=80)
         # Should succeed (or None only if unique_colors OOB, which won't happen for solid color)
         assert result is not None
+
+    def test_input_bpp_over_max_returns_none(self):
+        """input_bpp > MAX_INPUT_BPP should return None (feature_oob)."""
+        img = _make_rgb(32, 32)
+        # 32*32=1024 pixels; MAX_INPUT_BPP=64 → threshold = 64 * 1024 / 8 = 8192 bytes
+        # Use a size clearly above: 32*32 pixels × 64 bpp + 1 byte
+        oob_size = int(MAX_INPUT_BPP * 32 * 32 / 8) + 1  # just above threshold
+        result = extract_png_features(img, 32, 32, quality=80, orig_size=oob_size)
+        assert result is None
+
+    def test_input_bpp_at_max_passes(self):
+        """input_bpp == MAX_INPUT_BPP should pass (not strictly greater)."""
+        img = _make_rgb(32, 32)
+        # Exactly at threshold: orig_size * 8 / pixels == MAX_INPUT_BPP
+        exact_size = int(MAX_INPUT_BPP * 32 * 32 / 8)  # == 8192
+        result = extract_png_features(img, 32, 32, quality=80, orig_size=exact_size)
+        assert result is not None
+        assert result.input_bpp == MAX_INPUT_BPP
 
 
 # ---------------------------------------------------------------------------

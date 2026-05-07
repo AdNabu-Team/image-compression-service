@@ -21,7 +21,7 @@ from estimation.models._artifact import PngModel as PngModelDirect
 # ---------------------------------------------------------------------------
 
 _VALID_ARTIFACT: dict = {
-    "model_version": 1,
+    "model_version": 2,
     "format": "png",
     "features": [
         "has_alpha",
@@ -30,14 +30,23 @@ _VALID_ARTIFACT: dict = {
         "edge_density",
         "quality",
         "log10_orig_pixels",
+        "input_bpp",
     ],
     "supported_modes": ["RGB", "RGBA", "L", "LA", "P"],
     "scaler": {
-        "mean": [0.0, 2.5, 15.0, 0.1, 70.0, 5.0],
-        "scale": [1.0, 1.2, 10.0, 0.05, 20.0, 0.8],
+        "mean": [0.0, 2.5, 15.0, 0.1, 70.0, 5.0, 8.0],
+        "scale": [1.0, 1.2, 10.0, 0.05, 20.0, 0.8, 4.0],
     },
-    "coefficients": {"intercept": 0.5, "coef": [0.1, -0.2, 0.05, 0.3, -0.01, 0.15]},
+    "coefficients": {
+        "intercept": 0.5,
+        "coef": [0.1, -0.2, 0.05, 0.3, -0.01, 0.15, -0.05],
+        "knot_beta": 0.3,
+        "knot_q50_beta": -0.01,
+        "knot_q70_beta": 0.02,
+    },
     "knot_log10_unique_colors": 3.3,
+    "knot_q50": 50.0,
+    "knot_q70": 70.0,
     "training_envelope": {"log10_unique_colors": [0.0, 5.7], "mean_sobel": [0.0, 80.0]},
     "training_corpus_sha256": "abc123def456",
     "git_sha": "cafebabe",
@@ -104,9 +113,11 @@ class TestPngModelFromJson:
         assert isinstance(result, Loaded)
         model = result.model
         assert isinstance(model, PngModelDirect)
-        assert model.model_version == 1
+        assert model.model_version == 2
         assert model.format == "png"
         assert model.knot_log10_unique_colors == pytest.approx(3.3)
+        assert model.knot_q50 == pytest.approx(50.0)
+        assert model.knot_q70 == pytest.approx(70.0)
         assert model.git_sha == "cafebabe"
         assert "sklearn_version" in model.fit_environment
 

@@ -50,6 +50,7 @@ class FittedFallback:
         "mode_unsupported_or_oob",
         "model_load_failed",
         "prediction_oob",
+        "prediction_disagreement",
     ]
 
 
@@ -70,6 +71,7 @@ def _png_fitted_bpp(
     orig_w: int,
     orig_h: int,
     quality: int,
+    orig_size: int = 0,
 ) -> FittedBpp | FittedFallback:
     """Apply the fitted PNG BPP model to *img*.
 
@@ -83,16 +85,16 @@ def _png_fitted_bpp(
     1. Extract features (returns None on unsupported mode or OOB pixel count).
     2. Load the PNG model (lru-cached; never raises).
     3. Standardise features.
-    4. Apply piecewise-linear knot column.
+    4. Apply piecewise-linear knot columns (log10_unique_colors, q50, q70).
     5. Compute predicted BPP via dot-product.
-    6. Sanity-check the prediction.
+    6. Sanity-check the prediction (basic OOB + content-aware ratio gate).
     """
     import math
 
     import numpy as np
 
-    # 1. Feature extraction
-    features = extract_png_features(img, orig_w, orig_h, quality)
+    # 1. Feature extraction (pass orig_size for input_bpp)
+    features = extract_png_features(img, orig_w, orig_h, quality, orig_size)
     if features is None:
         return FittedFallback(reason="mode_unsupported_or_oob")
 
@@ -111,6 +113,7 @@ def _png_fitted_bpp(
         "edge_density": features.edge_density,
         "quality": float(features.quality),
         "log10_orig_pixels": features.log10_orig_pixels,
+        "input_bpp": features.input_bpp,
     }
     x_raw = np.array([feature_values[name] for name in model.features], dtype=np.float64)
 
@@ -119,26 +122,52 @@ def _png_fitted_bpp(
     scale_ = np.array(model.scaler["scale"], dtype=np.float64)
     x_scaled = (x_raw - mean_) / scale_
 
-    # 5. Piecewise-linear knot (raw log10_unique_colors, not standardised)
+    # 5. Piecewise-linear knots (raw feature values, not standardised)
     try:
-        knot_col_idx = model.features.index("log10_unique_colors")
+        knot_lc_idx = model.features.index("log10_unique_colors")
+        quality_idx = model.features.index("quality")
     except ValueError:
         return FittedFallback(reason="model_load_failed")
 
-    log10_uc = x_raw[knot_col_idx]
-    knot_val = max(0.0, log10_uc - model.knot_log10_unique_colors)
+    log10_uc = x_raw[knot_lc_idx]
+    knot_lc_val = max(0.0, log10_uc - model.knot_log10_unique_colors)
 
-    # 6. Predict: intercept + betas @ x_scaled + knot_beta * knot_val
+    quality_raw = x_raw[quality_idx]
+    knot_q50_val = max(0.0, quality_raw - model.knot_q50)
+    knot_q70_val = max(0.0, quality_raw - model.knot_q70)
+
+    # 6. Predict: intercept + betas @ x_scaled + knot contributions
     betas = np.array(model.coefficients["betas"], dtype=np.float64)
     predicted_bpp = (
         model.coefficients["intercept"]
         + float(betas @ x_scaled)
-        + model.coefficients["knot_beta"] * knot_val
+        + model.coefficients["knot_beta"] * knot_lc_val
+        + model.coefficients["knot_q50_beta"] * knot_q50_val
+        + model.coefficients["knot_q70_beta"] * knot_q70_val
     )
 
-    # 7. Post-prediction sanity (consensus #6)
+    # 7. Post-prediction sanity — basic finite/range check
     if not math.isfinite(predicted_bpp) or predicted_bpp < 0.001 or predicted_bpp > 32.0:
         return FittedFallback(reason="prediction_oob")
+
+    # 8. Content-aware ratio gate: output_bpp / input_bpp must be plausible.
+    # Only applies when input_bpp is known (orig_size > 0).
+    if features.input_bpp > 0.0:
+        # Maximum plausible compression ratio by quality regime:
+        # q < 50: pngquant caps max_colors=64, 20× max reduction → min ratio 0.05
+        # 50 <= q < 70: max_colors=256, 10× max reduction → min ratio 0.10
+        # q >= 70: lossless only, 2.5× max reduction → min ratio 0.40
+        if quality < 50:
+            min_ratio = 0.05
+        elif quality < 70:
+            min_ratio = 0.10
+        else:
+            min_ratio = 0.40
+        max_ratio = 1.10  # output should not exceed input by more than 10%
+
+        ratio = predicted_bpp / features.input_bpp
+        if ratio < min_ratio or ratio > max_ratio:
+            return FittedFallback(reason="prediction_disagreement")
 
     return FittedBpp(bpp=predicted_bpp)
 
@@ -358,7 +387,7 @@ async def _estimate_by_sample(
     # --- Fitted estimator path (PNG only, mode=active) ---
     strategy = _resolve_estimate_strategy(fmt)
     if strategy == "fitted" and fmt == ImageFormat.PNG:
-        fitted_result = _png_fitted_bpp(img, width, height, config.quality)
+        fitted_result = _png_fitted_bpp(img, width, height, config.quality, file_size)
         match fitted_result:
             case FittedBpp(bpp=bpp):
                 estimated_size = min(int(bpp * original_pixels / 8), file_size)
