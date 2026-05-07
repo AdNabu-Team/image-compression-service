@@ -36,7 +36,6 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import scipy
 
 logging.basicConfig(level=logging.WARNING, stream=sys.stderr)
@@ -212,11 +211,12 @@ async def _run_cases(
     return rows
 
 
-def _build_training_envelope(df: pd.DataFrame, feature_cols: list[str]) -> dict:
+def _build_training_envelope(rows: list[dict], feature_names: list[str]) -> dict:
     """Forensic min/max per feature for the training envelope."""
     envelope = {}
-    for col in feature_cols:
-        envelope[col] = [float(df[col].min()), float(df[col].max())]
+    for name in feature_names:
+        vals = [r[name] for r in rows]
+        envelope[name] = [float(min(vals)), float(max(vals))]
     return envelope
 
 
@@ -270,20 +270,8 @@ def main() -> int:
         )
         return 1
 
-    # Build DataFrame
-    df = pd.DataFrame(rows)
-
-    # Feature columns in PngFeatures order (must match model artifact's ``features`` list)
-    feature_cols = [
-        "has_alpha",
-        "log10_unique_colors",
-        "mean_sobel",
-        "edge_density",
-        "quality_feat",
-        "log10_orig_pixels",
-        "input_bpp",
-    ]
-    # Rename quality_feat → quality for the model artifact (matches PngFeatures field name)
+    # Feature names in PngFeatures order (must match model artifact's ``features`` list).
+    # Rows use 'quality_feat' internally; we map to 'quality' for the model artifact.
     feature_names = [
         "has_alpha",
         "log10_unique_colors",
@@ -293,18 +281,36 @@ def main() -> int:
         "log10_orig_pixels",
         "input_bpp",
     ]
+    # Column keys in the rows dict (quality stored as 'quality_feat' to avoid shadowing)
+    feature_row_keys = [
+        "has_alpha",
+        "log10_unique_colors",
+        "mean_sobel",
+        "edge_density",
+        "quality_feat",
+        "log10_orig_pixels",
+        "input_bpp",
+    ]
 
-    features_df = df[feature_cols].copy()
-    features_df.columns = feature_names  # type: ignore[assignment]
-    targets = df["actual_bpp"].values
+    # Build numpy arrays from list-of-dicts (no pandas)
+    X = np.asarray(
+        [[r[col] for col in feature_row_keys] for r in rows], dtype=np.float64
+    )
+    targets = np.asarray([r["actual_bpp"] for r in rows], dtype=np.float64)
+
+    # Rename rows to use model feature names (for training_envelope)
+    renamed_rows = [
+        {fname: r[rkey] for fname, rkey in zip(feature_names, feature_row_keys)}
+        for r in rows
+    ]
 
     # Fit (three knots: log10_unique_colors at 3.3, quality at 50 and 70)
     from bench.fit.common import train_one
 
-    result = train_one(features_df, targets, knot=3.3, knot_q50=50.0, knot_q70=70.0)
+    result = train_one(X, feature_names, targets, knot=3.3, knot_q50=50.0, knot_q70=70.0)
 
     # Training envelope (forensic)
-    training_envelope = _build_training_envelope(features_df, feature_names)
+    training_envelope = _build_training_envelope(renamed_rows, feature_names)
 
     # Build model artifact JSON (model_version=2 — schema changed: added input_bpp + quality knots)
     artifact = {

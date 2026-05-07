@@ -10,11 +10,11 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
-import pandas as pd
 
 
 def train_one(
-    features_df: pd.DataFrame,
+    features: np.ndarray,
+    feature_names: list[str],
     targets: np.ndarray,
     knot: float = 3.3,
     knot_q50: float = 50.0,
@@ -24,10 +24,13 @@ def train_one(
 
     Parameters
     ----------
-    features_df :
-        DataFrame where each column is a feature (in the order that matches the
-        ``features`` field in the model JSON).  Must include columns named
-        ``log10_unique_colors`` and ``quality`` for the knot terms.
+    features :
+        2-D float array of shape (n_samples, n_features) where each column is a
+        feature in the order that matches the ``features`` field in the model JSON.
+        Must include columns named ``log10_unique_colors`` and ``quality`` (as
+        identified by ``feature_names``) for the knot terms.
+    feature_names :
+        Ordered list of feature names corresponding to columns in ``features``.
     targets :
         1-D float array of actual BPP values (one per row).
     knot :
@@ -54,12 +57,14 @@ def train_one(
         ``train_residuals`` — {``median_rel_err``: float, ``p95_rel_err``: float,
                                ``max_rel_err``: float} on the training set
     """
-    feature_names: list[str] = list(features_df.columns)
-    X_raw = features_df.values.astype(np.float64)
-    y = targets.astype(np.float64)
+    X_raw = np.asarray(features, dtype=np.float64)
+    y = np.asarray(targets, dtype=np.float64)
 
     n, p = X_raw.shape
     assert n == len(y), f"Row count mismatch: X has {n} rows, y has {len(y)}"
+    assert p == len(feature_names), (
+        f"Column count mismatch: X has {p} columns, feature_names has {len(feature_names)}"
+    )
 
     # --- StandardScaler ---
     mean_ = X_raw.mean(axis=0)
@@ -73,8 +78,8 @@ def train_one(
         knot_col_idx = feature_names.index("log10_unique_colors")
     except ValueError as exc:
         raise ValueError(
-            f"features_df must contain 'log10_unique_colors' column for knot term; "
-            f"got columns: {feature_names}"
+            f"feature_names must contain 'log10_unique_colors' for knot term; "
+            f"got: {feature_names}"
         ) from exc
 
     # log10_unique_colors is already scaled; we need the *original* values for the knot
@@ -86,8 +91,8 @@ def train_one(
         quality_col_idx = feature_names.index("quality")
     except ValueError as exc:
         raise ValueError(
-            f"features_df must contain 'quality' column for quality knot terms; "
-            f"got columns: {feature_names}"
+            f"feature_names must contain 'quality' for quality knot terms; "
+            f"got: {feature_names}"
         ) from exc
 
     quality_raw = X_raw[:, quality_col_idx]
