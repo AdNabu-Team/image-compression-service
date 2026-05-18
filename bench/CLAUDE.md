@@ -205,7 +205,7 @@ Two workflows gate optimizer / estimator changes:
 
 **What `bench-baseline-update.yml` does after a merge to main**:
 1. Builds the Docker image (GHA layer cache).
-2. Inside the container, runs `python -m bench.corpus build --manifest core` then `python -m bench.run --mode accuracy --manifest core --repeat 3 --warmup 1 --out reports/_candidate.json`. Accuracy mode captures estimate + optimize per case; `--repeat 3` gives Welch's t-test enough samples for proper statistical gating.
+2. Inside the container, runs `python -m bench.corpus build --manifest core` then `python -m bench.run --mode accuracy --manifest core --repeat 3 --warmup 1 --out reports/_candidate.json`. Accuracy mode captures estimate + optimize per case. **Note**: accuracy mode currently ignores `--repeat`/`--warmup` and runs a single iteration per case — the flags are forward-compat for when accuracy mode is updated. Compression and estimation are deterministic so single-sample is correct for those axes; timing comparisons fall through to the 25% noise-floor path until accuracy mode honors `--repeat`.
 3. Runs `python -m bench.compare reports/baseline.core.json reports/_candidate.json --threshold-pct 10 --format markdown`. Compare emits four sections:
    - **Timing** — `wall_ms` deltas via Welch's t-test + Cohen's d (or noise-floor at <3 iters)
    - **Compression** — `method` downgrades to `"none"`, `reduction_pct` drops ≥ 3 pp, `optimized_size` growth ≥ 5%

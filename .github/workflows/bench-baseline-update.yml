@@ -50,11 +50,15 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build corpus + run accuracy mode in container
-        # Accuracy mode is a superset of quick — it runs estimate + optimize per
-        # case, capturing timing + compression + estimation data in one pass.
-        # `--repeat 3 --warmup 1` gives Welch's t-test enough samples for proper
-        # statistical gating (the noise-floor fallback at repeat=1 fired spurious
-        # drift issues; see #31).
+        # Accuracy mode is a superset of quick — it runs estimate + optimize
+        # per case, capturing timing + compression + estimation data in one pass.
+        #
+        # `--repeat 3 --warmup 1` is forward-compat: accuracy mode currently
+        # ignores these and runs a single iteration per case (the recorded
+        # config will show repeat=1). Compression and estimation metrics are
+        # deterministic so a single sample suffices for those axes. Timing
+        # comparisons currently fall through to the 25% noise-floor path until
+        # accuracy mode is updated to honor --repeat — see #31.
         run: |
           mkdir -p reports tests/corpus bench/corpus/cache
           docker run --rm -v "$(pwd):/work" -w /work \

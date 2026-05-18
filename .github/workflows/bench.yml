@@ -6,8 +6,8 @@ on:
       mode:
         description: 'Benchmark mode'
         type: choice
-        options: [pr, quick, timing, memory, accuracy, quality, load]
-        default: pr
+        options: [accuracy, quick, timing, memory, quality, load, pr]
+        default: accuracy
       manifest:
         description: 'Corpus manifest'
         type: choice

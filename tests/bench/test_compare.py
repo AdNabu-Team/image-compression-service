@@ -602,6 +602,23 @@ class TestEstimationDiff:
         assert result.estimation_diffs == []
         assert result.exit_code == 0
 
+    def test_estimation_skipped_when_baseline_only_has_data(self, tmp_path: Path):
+        """Symmetric to above: baseline has accuracy fields, head doesn't → skipped."""
+        a = _write_with_metadata(
+            tmp_path,
+            "a.json",
+            [_iter_with_accuracy("img.png@high", 100.0, size_rel_error_pct=5.0)],
+            mode="accuracy",
+        )
+        b = _write_with_metadata(
+            tmp_path,
+            "b.json",
+            [_iter("img.png@high", 100.0)],  # quick-mode, no accuracy fields
+        )
+        result = compare(a, b, allow_mismatched_mode=True)
+        assert result.estimation_diffs == []
+        assert result.exit_code == 0
+
 
 # ---------------------------------------------------------------------------
 # Error-count axis
