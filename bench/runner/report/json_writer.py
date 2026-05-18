@@ -39,6 +39,19 @@ from bench.runner.stats import CaseStats, summarize_iterations
 SCHEMA_VERSION = 2
 
 
+def _available_cpu_count() -> int:
+    """Return the number of CPUs the current process can actually use.
+
+    Prefers `os.sched_getaffinity` on Linux because it respects cpuset/cgroup
+    constraints (e.g. `docker run --cpuset-cpus=0-7`). Falls back to
+    `os.cpu_count()` on platforms without sched_getaffinity (macOS, Windows).
+    """
+    try:
+        return len(os.sched_getaffinity(0))
+    except AttributeError:
+        return os.cpu_count() or 1
+
+
 @dataclass
 class GitInfo:
     commit: str = ""
@@ -64,7 +77,7 @@ class RunMetadata:
     host: HostInfo = field(
         default_factory=lambda: HostInfo(
             platform=platform.system().lower(),
-            cpu_count=os.cpu_count() or 1,
+            cpu_count=_available_cpu_count(),
         )
     )
     library_versions: dict[str, str] = field(default_factory=collect_library_versions)
