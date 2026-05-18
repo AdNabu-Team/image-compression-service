@@ -16,8 +16,8 @@ import pytest
 
 from bench.runner.compare import CaseDiff, CompareResult, render_compare_markdown  # noqa: E402
 from bench.runner.report.markdown import (
-    _extract_format,
     build_format_rollup,
+    extract_format,
     render_format_rollup_table,
 )
 
@@ -74,7 +74,7 @@ def _flat(case_id: str, delta_pct: float = 1.0) -> CaseDiff:
 
 
 # ---------------------------------------------------------------------------
-# _extract_format
+# extract_format
 # ---------------------------------------------------------------------------
 
 
@@ -92,7 +92,7 @@ def _flat(case_id: str, delta_pct: float = 1.0) -> CaseDiff:
     ],
 )
 def test_extract_format(case_id: str, expected: str):
-    assert _extract_format(case_id) == expected
+    assert extract_format(case_id) == expected
 
 
 # ---------------------------------------------------------------------------

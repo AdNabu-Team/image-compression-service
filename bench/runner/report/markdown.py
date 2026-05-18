@@ -59,7 +59,7 @@ _LABEL_SEVERITY: dict[str, int] = {
 }
 
 
-def _extract_format(case_id: str) -> str:
+def extract_format(case_id: str) -> str:
     """Return the format token from a case_id like ``name.ext@preset``.
 
     The canonical shape is ``<entry_name>.<fmt>@<preset>`` — e.g.
@@ -110,7 +110,7 @@ def build_format_rollup(diffs: "list[CaseDiff]") -> list[FormatRollup]:
     """
     by_fmt: dict[str, list[CaseDiff]] = {}
     for d in diffs:
-        fmt = _extract_format(d.case_id)
+        fmt = extract_format(d.case_id)
         by_fmt.setdefault(fmt, []).append(d)
 
     rollups: list[FormatRollup] = []

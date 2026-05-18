@@ -23,12 +23,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from statistics import median as _statistics_median
 from typing import Any
 
 from bench.runner.report.json_writer import load_run
 from bench.runner.report.markdown import (
-    _extract_format,
     build_format_rollup,
+    extract_format,
     format_compare_label,
     render_format_rollup_table,
 )
@@ -78,6 +79,7 @@ class ErrorCountDelta:
     head_only_errors: list[str]  # case_ids errored in head but not baseline
     n_baseline_errors: int
     n_head_errors: int
+    head_only_error_details: dict[str, str] = field(default_factory=dict)  # {case_id: error_msg}
 
     @property
     def regressed(self) -> bool:
@@ -153,6 +155,11 @@ class CompareResult:
     reduction_threshold_pp: float = 3.0
     size_threshold_pct: float = 5.0
     estimation_threshold_pp: float = 10.0
+    # True when one side has accuracy data and the other doesn't — gate was skipped.
+    estimation_asymmetric: bool = False
+    # Which sides have accuracy data (for the rendered notice).
+    baseline_has_accuracy: bool = False
+    head_has_accuracy: bool = False
 
     @property
     def regressions(self) -> list[CaseDiff]:
@@ -194,7 +201,13 @@ class CompareResult:
 
 
 def _extract_compression(run: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Return first non-errored iteration's compression fields per case_id."""
+    """Return first non-errored iteration's compression fields per case_id.
+
+    Compression fields (`method`, `reduction_pct`, `optimized_size`) are
+    deterministic by design — same input + same algorithm = same output —
+    so iterations after the first carry redundant data. Picking the first
+    is correct and avoids comparing arrays where a scalar suffices.
+    """
     seen: dict[str, dict[str, Any]] = {}
     for it in run.get("iterations", []):
         if "error" in it:
@@ -218,6 +231,9 @@ def _extract_compression(run: dict[str, Any]) -> dict[str, dict[str, Any]]:
 def _extract_estimation(run: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """Return estimation accuracy fields per case_id (accuracy-mode only).
 
+    Like `_extract_compression`, only the first non-errored iteration per case_id
+    is kept — estimation path and size_rel_error_pct are deterministic outputs
+    of the same estimator call, so subsequent iterations add no new information.
     Returns an empty dict when the run has no accuracy data (quick-mode JSON).
     """
     seen: dict[str, dict[str, Any]] = {}
@@ -426,6 +442,9 @@ def compare(
     a_est = _extract_estimation(a_run)
     b_est = _extract_estimation(b_run)
     estimation_diffs: list[EstimationDiff] = []
+    baseline_has_accuracy = bool(a_est)
+    head_has_accuracy = bool(b_est)
+    estimation_asymmetric = bool(a_est) != bool(b_est)
     # Only populate when both sides have estimation data.
     if a_est and b_est:
         for case_id in sorted(set(a_est) & set(b_est)):
@@ -452,10 +471,12 @@ def compare(
     a_errors = _extract_errors(a_run)
     b_errors = _extract_errors(b_run)
     head_only = sorted(cid for cid in b_errors if cid not in a_errors)
+    head_only_details = {cid: b_errors[cid] for cid in head_only}
     error_count_delta = ErrorCountDelta(
         head_only_errors=head_only,
         n_baseline_errors=len(a_errors),
         n_head_errors=len(b_errors),
+        head_only_error_details=head_only_details,
     )
 
     return CompareResult(
@@ -475,6 +496,9 @@ def compare(
         reduction_threshold_pp=reduction_threshold_pp,
         size_threshold_pct=size_threshold_pct,
         estimation_threshold_pp=estimation_threshold_pp,
+        estimation_asymmetric=estimation_asymmetric,
+        baseline_has_accuracy=baseline_has_accuracy,
+        head_has_accuracy=head_has_accuracy,
     )
 
 
@@ -617,7 +641,7 @@ def _render_compression_section(result: CompareResult) -> str:
     # Per-format rollup
     by_fmt: dict[str, list[CompressionDiff]] = {}
     for d in result.compression_diffs:
-        fmt = _extract_format(d.case_id)
+        fmt = extract_format(d.case_id)
         by_fmt.setdefault(fmt, []).append(d)
 
     lines.append(
@@ -629,10 +653,15 @@ def _render_compression_section(result: CompareResult) -> str:
         group = by_fmt[fmt]
         method_changes = sum(1 for d in group if d.baseline_method != d.head_method)
         deltas = [d.reduction_delta_pp for d in group]
-        med_delta = sorted(deltas)[len(deltas) // 2] if deltas else 0.0
+        med_delta = _statistics_median(deltas) if deltas else 0.0
         worst_delta = min(deltas) if deltas else 0.0
         size_regs = sum(1 for d in group if d.size_regressed)
         has_breach = any(d.threshold_breach for d in group)
+        # Severity icons reflect failure-mode category, not exit-code parity:
+        # method="none" means the optimizer path is fully broken (❌). A reduction
+        # drop or size growth means the optimizer still ran but produced worse
+        # output (⚠). Both gate the run via exit 1; the icons distinguish
+        # "pipeline broken" from "pipeline degraded" for triage.
         status = (
             "❌"
             if any(d.method_downgraded_to_none for d in group)
@@ -690,7 +719,25 @@ def _render_compression_section(result: CompareResult) -> str:
 
 
 def _render_estimation_section(result: CompareResult) -> str:
-    """Render the Estimation axis section. Returns empty string if no data."""
+    """Render the Estimation axis section. Returns empty string if no data on either side.
+
+    When one side has accuracy data and the other doesn't, renders a clear notice so users
+    know the gate was skipped rather than silently omitting the section.
+    """
+    if result.estimation_asymmetric:
+        baseline_yn = "yes" if result.baseline_has_accuracy else "no"
+        head_yn = "yes" if result.head_has_accuracy else "no"
+        lines: list[str] = []
+        lines.append("## Estimation")
+        lines.append("")
+        lines.append(
+            f"_⚠ Estimation gating skipped: one side lacks accuracy-mode data "
+            f"(baseline has accuracy fields: {baseline_yn}, head has accuracy fields: {head_yn}). "
+            f"A regression in size_rel_error_pct or path shift would NOT be flagged. "
+            f"Run both baseline and head with --mode accuracy to enable this gate._"
+        )
+        return "\n".join(lines)
+
     if not result.estimation_diffs:
         return ""
 
@@ -703,7 +750,7 @@ def _render_estimation_section(result: CompareResult) -> str:
     # Per-format×path rollup
     by_fmt_path: dict[str, list[EstimationDiff]] = {}
     for d in result.estimation_diffs:
-        fmt = _extract_format(d.case_id)
+        fmt = extract_format(d.case_id)
         key = f"{fmt} × {d.baseline_path}"
         by_fmt_path.setdefault(key, []).append(d)
 
@@ -713,7 +760,7 @@ def _render_estimation_section(result: CompareResult) -> str:
     for key in sorted(by_fmt_path.keys()):
         group = by_fmt_path[key]
         deltas = [d.error_delta_pp for d in group]
-        med_delta = sorted(deltas)[len(deltas) // 2] if deltas else 0.0
+        med_delta = _statistics_median(deltas) if deltas else 0.0
         worst_delta = max(deltas) if deltas else 0.0
         path_shifts = sum(1 for d in group if d.path_shifted)
         has_regression = any(d.error_regressed for d in group)
@@ -756,8 +803,10 @@ def _render_errors_section(result: CompareResult) -> str:
     lines.append("## Errors")
     lines.append("")
     lines.append(f"⚠ {len(ecd.head_only_errors)} case(s) errored in head but not in baseline:")
-    # We only have the case_ids; the run JSON doesn't carry the error message
-    # through ErrorCountDelta (it's a case_id list). Just list the ids.
     for cid in ecd.head_only_errors:
-        lines.append(f"- `{cid}`")
+        detail = ecd.head_only_error_details.get(cid, "")
+        if detail:
+            lines.append(f"- `{cid}`: {detail[:200]}")
+        else:
+            lines.append(f"- `{cid}`")
     return "\n".join(lines)

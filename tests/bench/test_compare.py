@@ -627,7 +627,8 @@ class TestEstimationDiff:
 
 class TestErrorCountDelta:
     def test_head_only_error_is_regression(self, tmp_path: Path):
-        """baseline has no errors, head has 1 case errored → regressed=True, exit 1."""
+        """baseline has no errors, head has 1 case errored → regressed=True, exit 1,
+        and head_only_error_details is populated with the error message."""
         a = _write_with_metadata(
             tmp_path,
             "a.json",
@@ -649,3 +650,53 @@ class TestErrorCountDelta:
         assert result.error_count_delta.regressed is True
         assert "img.png@high" in result.error_count_delta.head_only_errors
         assert result.exit_code == 1
+        # Fix #8: error details must be plumbed through
+        assert "img.png@high" in result.error_count_delta.head_only_error_details
+        assert "SomeError" in result.error_count_delta.head_only_error_details["img.png@high"]
+
+
+# ---------------------------------------------------------------------------
+# Estimation section: asymmetric data notice (Fix #4)
+# ---------------------------------------------------------------------------
+
+
+class TestEstimationAsymmetricNotice:
+    def test_estimation_renders_skip_notice_on_asymmetric_data(self, tmp_path: Path):
+        """One side has accuracy data, other doesn't → notice rendered instead of silent skip."""
+        from bench.runner.compare import render_compare_markdown
+
+        # baseline: quick-mode (no accuracy fields)
+        a = _write_with_metadata(
+            tmp_path,
+            "a.json",
+            [_iter("img.png@high", 100.0)],
+        )
+        # head: accuracy-mode (has accuracy fields)
+        b = _write_with_metadata(
+            tmp_path,
+            "b.json",
+            [_iter_with_accuracy("img.png@high", 100.0, size_rel_error_pct=5.0)],
+            mode="accuracy",
+        )
+        result = compare(a, b, allow_mismatched_mode=True)
+        assert result.estimation_asymmetric is True
+        assert result.baseline_has_accuracy is False
+        assert result.head_has_accuracy is True
+
+        md = render_compare_markdown(result)
+        assert "## Estimation" in md
+        assert "Estimation gating skipped" in md
+        assert "baseline has accuracy fields: no" in md
+        assert "head has accuracy fields: yes" in md
+        assert "--mode accuracy" in md
+
+    def test_estimation_no_notice_when_both_sides_missing(self, tmp_path: Path):
+        """Both sides quick-mode (no accuracy fields) → section omitted silently."""
+        from bench.runner.compare import render_compare_markdown
+
+        a = _write_with_metadata(tmp_path, "a.json", [_iter("img.png@high", 100.0)])
+        b = _write_with_metadata(tmp_path, "b.json", [_iter("img.png@high", 100.0)])
+        result = compare(a, b)
+        assert result.estimation_asymmetric is False
+        md = render_compare_markdown(result)
+        assert "Estimation gating skipped" not in md
