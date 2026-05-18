@@ -21,17 +21,17 @@ BASELINE_UPDATE_WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "bench-baselin
 
 
 # ---------------------------------------------------------------------------
-# 1. Baseline exists, parses cleanly, and is a quick-mode run with ≥100 rows
+# 1. Baseline exists, parses cleanly, and is an accuracy-mode run with ≥100 rows
 # ---------------------------------------------------------------------------
 
 
 def test_baseline_file_exists_and_parses():
     """reports/baseline.core.json must exist, load as schema_version=2,
-    be a 'quick' run, and contain at least 100 iteration rows.
+    be an 'accuracy' run, and contain at least 100 iteration rows.
     """
     assert BASELINE_PATH.exists(), (
         f"Pinned baseline not found at {BASELINE_PATH}. "
-        "Run: python -m bench.run --mode quick --manifest core "
+        "Run: python -m bench.run --mode accuracy --manifest core "
         "--annotate env=local-venv-bootstrap --out reports/baseline.core.json"
     )
 
@@ -39,7 +39,7 @@ def test_baseline_file_exists_and_parses():
 
     run = load_run(BASELINE_PATH)
 
-    assert run["mode"] == "quick", f"Expected mode='quick', got {run['mode']!r}"
+    assert run["mode"] == "accuracy", f"Expected mode='accuracy', got {run['mode']!r}"
     assert len(run["iterations"]) >= 100, (
         f"Expected ≥100 iteration rows, got {len(run['iterations'])}. "
         "Was the baseline generated with --manifest core?"

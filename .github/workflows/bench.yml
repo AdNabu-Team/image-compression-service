@@ -6,8 +6,8 @@ on:
       mode:
         description: 'Benchmark mode'
         type: choice
-        options: [pr, quick, timing, memory, accuracy, quality, load]
-        default: pr
+        options: [accuracy, quick, timing, memory, quality, load, pr]
+        default: accuracy
       manifest:
         description: 'Corpus manifest'
         type: choice
@@ -39,7 +39,7 @@ jobs:
   bench:
     name: Bench (${{ inputs.mode }} / ${{ inputs.manifest }})
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@v4
