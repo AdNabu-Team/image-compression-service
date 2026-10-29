@@ -31,6 +31,7 @@ COPY --from=mozjpeg-builder /opt/mozjpeg/bin/jpegtran /usr/local/bin/jpegtran
 
 # Install system compression tools + codec libraries
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
     pngquant \
     gifsicle \
     libheif1 \
@@ -45,6 +46,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application
 COPY . /app
 WORKDIR /app
+# Drop the compromised eMudhra/emSign CAs from certifi and the OS store (security/trust_store.py)
+RUN python -m security.trust_store
 
 # Cloud Run sets $PORT; Uvicorn workers configurable
 CMD ["sh", "-c", \
