@@ -125,5 +125,26 @@ async def test_gcs_upload_failure_handling(storage_config):
 
     from exceptions import PareError
 
-    with pytest.raises(PareError, match="GCS upload failed"):
+    with pytest.raises(PareError, match="Storage upload failed"):
         await uploader.upload(b"data", "png", storage_config)
+
+
+@pytest.mark.asyncio
+async def test_gcs_upload_failure_hides_provider_error(storage_config, caplog):
+    """The GCS exception text is logged, not returned to the caller."""
+    from exceptions import PareError
+
+    uploader = GCSUploader()
+    mock_client = MagicMock()
+    mock_client.bucket.side_effect = Exception(
+        "403 svc@internal-project lacks storage.objects.create"
+    )
+    uploader._client = mock_client
+
+    with caplog.at_level("ERROR", logger="storage.gcs"):
+        with pytest.raises(PareError) as exc:
+            await uploader.upload(b"data", "png", storage_config)
+
+    assert exc.value.message == "Storage upload failed"
+    assert "internal-project" not in str(exc.value.details)
+    assert "internal-project" in caplog.text

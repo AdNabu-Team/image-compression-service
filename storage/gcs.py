@@ -64,9 +64,12 @@ class GCSUploader:
                 public_url=public_url,
             )
 
-        except Exception as e:
+        except Exception:
+            # GCS error text can name projects, service accounts and IAM detail;
+            # keep it in our logs and give the caller a generic message.
+            logger.exception("gcs_upload_failed bucket=%s path=%s", config.bucket, config.path)
             raise PareError(
-                f"GCS upload failed: {e}",
+                "Storage upload failed",
                 bucket=config.bucket,
                 path=config.path,
             )
