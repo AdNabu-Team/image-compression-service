@@ -389,7 +389,7 @@ All settings via environment variables (see `config.py`):
 
 ## Security
 
-- **SSRF protection**: All URL fetches validate DNS resolution against private/reserved IP ranges (127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, link-local, cloud metadata endpoints) at every redirect hop
+- **SSRF protection**: All URL fetches resolve the hostname and refuse any address that is not globally routable unicast (private, loopback, link-local, CGNAT, reserved, multicast, and IPv4-mapped or NAT64 forms of those) plus cloud metadata hostnames, at every redirect hop
 - **SVG sanitization**: Strips scripts, event handlers, and `foreignObject` elements
 - **Format detection**: Based on magic bytes, never file extension or Content-Type header
 - **Backpressure**: Semaphore-bounded concurrency with queue depth cap — returns 503 immediately when full to prevent OOM

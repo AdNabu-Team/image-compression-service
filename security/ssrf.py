@@ -1,26 +1,36 @@
 import ipaddress
+import logging
 import socket
 from urllib.parse import urlparse
 
 from exceptions import SSRFError
 
-# Blocked IP networks (private, loopback, link-local, unspecified)
-BLOCKED_NETWORKS = [
-    ipaddress.ip_network("10.0.0.0/8"),
-    ipaddress.ip_network("172.16.0.0/12"),
-    ipaddress.ip_network("192.168.0.0/16"),
-    ipaddress.ip_network("169.254.0.0/16"),
-    ipaddress.ip_network("127.0.0.0/8"),
-    ipaddress.ip_network("0.0.0.0/8"),
-    ipaddress.ip_network("::1/128"),
-    ipaddress.ip_network("fc00::/7"),
-]
+logger = logging.getLogger("pare.security.ssrf")
+
+# NAT64 well-known prefix: is_global is True for it, but a NAT64 gateway maps
+# the low 32 bits to an IPv4 address, which must be checked on its own.
+_NAT64_PREFIX = ipaddress.ip_network("64:ff9b::/96")
 
 # Blocked hostnames (case-insensitive)
 BLOCKED_HOSTNAMES = {
     "metadata.google.internal",
     "metadata.google.internal.",
 }
+
+
+def is_blocked_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """Return True unless `ip` is a globally routable unicast address.
+
+    Uses the IANA special-purpose registries behind `ipaddress.is_global`
+    (private, loopback, link-local, CGNAT 100.64/10, reserved, ...), and
+    unwraps IPv4-mapped and NAT64 addresses so the embedded IPv4 is checked.
+    """
+    if isinstance(ip, ipaddress.IPv6Address):
+        if ip.ipv4_mapped is not None:
+            ip = ip.ipv4_mapped
+        elif ip in _NAT64_PREFIX:
+            ip = ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
+    return not ip.is_global or ip.is_multicast
 
 
 def validate_url(url: str) -> str:
@@ -56,7 +66,9 @@ def validate_url(url: str) -> str:
             url=url,
         )
 
-    # 3. DNS resolution — resolve before any HTTP request to prevent rebinding
+    # 3. DNS resolution. The HTTP client resolves again when it connects, so
+    # this does not stop DNS rebinding; it blocks names that resolve to
+    # internal addresses at check time.
     try:
         addr_infos = socket.getaddrinfo(hostname, None)
     except socket.gaierror:
@@ -65,12 +77,12 @@ def validate_url(url: str) -> str:
     # 4. IP validation — check every resolved address
     for family, _, _, _, sockaddr in addr_infos:
         ip = ipaddress.ip_address(sockaddr[0])
-        for network in BLOCKED_NETWORKS:
-            if ip in network:
-                raise SSRFError(
-                    "URL resolves to a private/reserved IP address",
-                    url=url,
-                    resolved_ip=str(ip),
-                )
+        if is_blocked_ip(ip):
+            # The address stays in our logs; callers only learn it was refused.
+            logger.warning("ssrf_blocked host=%s ip=%s", hostname, ip)
+            raise SSRFError(
+                "URL resolves to a private/reserved IP address",
+                url=url,
+            )
 
     return url
