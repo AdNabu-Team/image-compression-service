@@ -12,6 +12,7 @@ from schemas import (
     OptimizeResult,
     StorageConfig,
 )
+from security.auth import require_authenticated
 from storage.gcs import gcs_uploader
 from utils.concurrency import MEMORY_MULTIPLIERS, compression_gate
 from utils.format_detect import MIME_TYPES, detect_format
@@ -67,8 +68,11 @@ async def optimize(
     if file is not None:
         # Multipart file upload mode -- streams in chunks to reject oversized
         # uploads before the full body is buffered in RAM.
-        data = await _read_upload_streaming(file)
         opt_config, storage_config = _parse_form_options(options)
+        if storage_config:
+            # Uploads run as the service account; only key holders may use them.
+            require_authenticated(request, "storage uploads")
+        data = await _read_upload_streaming(file)
     elif "application/json" in content_type:
         # JSON URL mode
         try:
@@ -81,6 +85,9 @@ async def optimize(
 
         opt_config = OptimizationConfig(**body.get("optimization", {}))
         storage_config = StorageConfig(**body["storage"]) if "storage" in body else None
+        if storage_config:
+            # Uploads run as the service account; only key holders may use them.
+            require_authenticated(request, "storage uploads")
 
         is_authenticated = getattr(request.state, "is_authenticated", False)
         data = await fetch_image(url, is_authenticated=is_authenticated)

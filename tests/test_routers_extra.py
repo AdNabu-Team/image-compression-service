@@ -159,6 +159,10 @@ def test_optimize_file_too_large(client):
     assert resp.status_code == 413
 
 
+# Storage uploads need an authenticated request; with API_KEY unset (tests) any bearer works.
+_DEV_AUTH = {"Authorization": "Bearer test-key"}
+
+
 def test_optimize_with_storage_config(client):
     """POST /optimize with storage config returns JSON response."""
     from schemas import StorageResult
@@ -179,7 +183,7 @@ def test_optimize_with_storage_config(client):
                         "path": "output/image.png",
                     },
                 },
-                headers={"Content-Type": "application/json"},
+                headers={"Content-Type": "application/json", **_DEV_AUTH},
             )
     assert resp.status_code == 200
     body = resp.json()
@@ -209,6 +213,7 @@ def test_optimize_json_with_storage(client):
                         "path": "output/image.png",
                     },
                 },
+                headers=_DEV_AUTH,
             )
     assert resp.status_code == 200
     body = resp.json()
@@ -241,6 +246,7 @@ def test_optimize_form_with_options(client):
                     }
                 )
             },
+            headers=_DEV_AUTH,
         )
     assert resp.status_code == 200
     body = resp.json()

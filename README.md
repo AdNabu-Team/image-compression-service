@@ -48,7 +48,7 @@ Bearer token via the `Authorization` header. Configure via the `API_KEY` environ
 Authorization: Bearer <your-api-key>
 ```
 
-When `API_KEY` is empty (default), the service runs in dev mode — no authentication required.
+Requests without an `Authorization` header are public and rate-limited; storage uploads (below) require a valid key. When `API_KEY` is empty (default), the service runs in dev mode and accepts any bearer token, except on Cloud Run (`K_SERVICE` set), where it rejects every bearer token, so set `API_KEY` there.
 
 ### Error Responses
 
@@ -179,7 +179,7 @@ curl -X POST http://localhost:8080/optimize \
 
 #### Storage Parameters (optional)
 
-When provided, the optimized image is uploaded to cloud storage and a JSON response is returned instead of binary data.
+When provided, the optimized image is uploaded to cloud storage and a JSON response is returned instead of binary data. Requires a valid API key (401 otherwise), because the upload runs as the service account.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -372,7 +372,7 @@ All settings via environment variables (see `config.py`):
 | `MAX_FILE_SIZE_MB` | 32 | Upload size limit in MB |
 | `DEFAULT_QUALITY` | 80 | Default quality when not specified (1-100) |
 | `TOOL_TIMEOUT_SECONDS` | 60 | Per-tool compression timeout |
-| `API_KEY` | `""` | Bearer token (empty = dev mode, no auth) |
+| `API_KEY` | `""` | Bearer token (empty = dev mode; on Cloud Run, empty rejects all bearer tokens) |
 | `REDIS_URL` | `""` | Redis URL for rate limiting (empty = disabled) |
 | `RATE_LIMIT_PUBLIC_RPM` | 60 | Public requests per minute (0 = unlimited) |
 | `RATE_LIMIT_PUBLIC_BURST` | 10 | Public requests per 10s burst (0 = unlimited) |

@@ -36,6 +36,7 @@ def test_auth_no_api_key_configured():
     req = _make_request("Bearer any-key-works")
     with patch("security.auth.settings") as mock_settings:
         mock_settings.api_key = ""
+        mock_settings.k_service = ""
         assert authenticate(req) is True
 
 
@@ -54,3 +55,22 @@ def test_auth_invalid_key():
         mock_settings.api_key = "correct-key"
         with pytest.raises(AuthenticationError):
             authenticate(req)
+
+
+def test_auth_no_api_key_configured_on_cloud_run_fails_closed():
+    """No API_KEY on Cloud Run (K_SERVICE set) -> bearer tokens are rejected."""
+    req = _make_request("Bearer any-key")
+    with patch("security.auth.settings") as mock_settings:
+        mock_settings.api_key = ""
+        mock_settings.k_service = "pare"
+        with pytest.raises(AuthenticationError):
+            authenticate(req)
+
+
+def test_auth_no_api_key_configured_on_cloud_run_allows_public():
+    """No API_KEY on Cloud Run -> requests without a header stay public."""
+    req = _make_request()
+    with patch("security.auth.settings") as mock_settings:
+        mock_settings.api_key = ""
+        mock_settings.k_service = "pare"
+        assert authenticate(req) is False

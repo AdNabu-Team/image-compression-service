@@ -8,7 +8,7 @@ Security layers applied via `SecurityMiddleware` (in root `middleware.py`). All 
 
 ## Modules
 
-- **`auth.py`**: Bearer token validation. Empty `API_KEY` config = dev mode (accepts all tokens). No token header = public request (not an error).
+- **`auth.py`**: Bearer token validation. Empty `API_KEY` = dev mode (accepts any token), except on Cloud Run (`K_SERVICE` set), where it fails closed. No token header = public request (not an error), but `require_authenticated()` gates features that act with the service account (storage uploads).
 - **`rate_limiter.py`**: Redis-backed sliding window (per-minute) + burst limiter (per-10s). Fail-open design: if Redis is unavailable, requests pass through. Lazy Redis init.
 - **`ssrf.py`**: Validates URLs before fetch. Blocks private/reserved IPs, cloud metadata endpoints, non-HTTPS schemes. Resolves DNS before checking to prevent rebinding attacks.
 - **`svg_sanitizer.py`**: Strips `<script>`, `<foreignObject>`, event handlers (`on*` attributes), `data:text/html` URIs, CSS `@import url()`. Uses `defusedxml` for XXE-safe parsing.
