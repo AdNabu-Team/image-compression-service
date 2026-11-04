@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     rate_limit_auth_enabled: bool = False
     rate_limit_auth_rpm: int = 0
     api_key: str = ""
+    # Set by Cloud Run on every instance. When present, an empty API_KEY is a
+    # misconfiguration rather than dev mode, so bearer tokens are rejected.
+    k_service: str = ""
     allowed_origins: str = "*"
 
     # --- URL Fetching ---

@@ -10,7 +10,7 @@ Cloud storage upload after optimization. Currently only Google Cloud Storage (GC
 
 `GCSUploader` is a module-level singleton with lazy client initialization. Authentication is automatic on Cloud Run (workload identity) and via `GOOGLE_APPLICATION_CREDENTIALS` locally.
 
-Storage is optional — the `/optimize` endpoint only uploads when a `storage` config is provided in the request. Without it, optimized bytes are returned directly in the response body.
+Storage is optional — the `/optimize` endpoint only uploads when a `storage` config is provided in the request. Without it, optimized bytes are returned directly in the response body. The upload runs as the service account to a caller-chosen bucket, so `routers/optimize.py` refuses `storage` on unauthenticated requests before fetching or optimizing.
 
 ## Adding a New Provider
 
