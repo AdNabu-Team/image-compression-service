@@ -17,5 +17,6 @@ Security layers applied via `SecurityMiddleware` (in root `middleware.py`). All 
 ## Design Decisions
 
 - Rate limiter uses **fail-open** — Redis outage should not take down the API
+- The rate-limit key is the `X-Forwarded-For` entry `TRUSTED_PROXY_COUNT` from the right (`middleware._get_client_ip`); the leftmost entries are client-controlled, so keying on them lets a caller dodge the limit
 - SSRF protection resolves DNS and checks **every** resolved IP address against blocked ranges
 - SVG sanitization happens during optimization (in `optimizers/svg.py`), not in the security middleware

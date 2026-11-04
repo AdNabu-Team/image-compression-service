@@ -71,8 +71,18 @@ class SecurityMiddleware(BaseHTTPMiddleware):
 
 
 def _get_client_ip(request: Request) -> str:
-    """Extract client IP from X-Forwarded-For or direct connection."""
+    """Extract the client IP for rate limiting.
+
+    Trusted proxies append to X-Forwarded-For, so the client IP is the entry
+    `trusted_proxy_count` places from the right; anything left of it is
+    whatever the client sent and must not be used as the rate-limit key.
+    """
+    peer = request.client.host if request.client else "unknown"
+    hops = settings.trusted_proxy_count
     forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+    if hops <= 0 or not forwarded:
+        return peer
+    entries = [e.strip() for e in forwarded.split(",") if e.strip()]
+    if not entries:
+        return peer
+    return entries[-hops] if len(entries) >= hops else entries[0]

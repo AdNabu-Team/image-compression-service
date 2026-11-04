@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     # misconfiguration rather than dev mode, so bearer tokens are rejected.
     k_service: str = ""
     allowed_origins: str = "*"
+    # Proxies that append to X-Forwarded-For in front of the app (Cloud Run's
+    # front end = 1; add 1 for an external load balancer). The client IP is the
+    # entry this many places from the right; entries left of it are spoofable.
+    # 0 ignores the header and uses the socket peer.
+    trusted_proxy_count: int = 1
 
     # --- URL Fetching ---
     url_fetch_timeout: int = 30
