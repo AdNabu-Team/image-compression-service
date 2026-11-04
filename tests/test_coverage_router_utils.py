@@ -12,7 +12,7 @@ Coverage targets:
 
 import asyncio
 import io
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -171,17 +171,7 @@ async def test_fetch_dimensions_range_request_success():
     Image.new("RGB", (320, 240)).save(buf, format="JPEG", quality=95)
     jpeg_bytes = buf.getvalue()
 
-    mock_response = MagicMock()
-    mock_response.content = jpeg_bytes
-
-    mock_client = AsyncMock()
-    mock_client.get = AsyncMock(return_value=mock_response)
-
-    with (
-        # validate_url is a local import inside _fetch_dimensions
-        patch("security.ssrf.validate_url"),
-        patch("routers.estimate._get_client", new=AsyncMock(return_value=mock_client)),
-    ):
+    with patch("routers.estimate.fetch_partial", new=AsyncMock(return_value=(jpeg_bytes, None))):
         width, height = await _fetch_dimensions(
             "https://example.com/img.jpg", is_authenticated=True
         )
@@ -199,12 +189,11 @@ async def test_fetch_dimensions_fallback_on_exception():
     Image.new("RGB", (100, 80)).save(buf, format="JPEG", quality=95)
     jpeg_bytes = buf.getvalue()
 
-    mock_client = AsyncMock()
-    mock_client.get = AsyncMock(side_effect=Exception("range not supported"))
-
     with (
-        patch("security.ssrf.validate_url"),
-        patch("routers.estimate._get_client", new=AsyncMock(return_value=mock_client)),
+        patch(
+            "routers.estimate.fetch_partial",
+            new=AsyncMock(side_effect=Exception("range not supported")),
+        ),
         patch("routers.estimate.fetch_image", new=AsyncMock(return_value=jpeg_bytes)),
     ):
         w, h = await _fetch_dimensions("https://example.com/img.jpg", is_authenticated=False)

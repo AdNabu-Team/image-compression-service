@@ -1,20 +1,20 @@
 import io
 import json
 
-import httpx
 from fastapi import APIRouter, File, Form, Request, UploadFile
+from PIL import Image
 
 from config import settings
 from estimation.estimator import estimate as run_estimate
 from estimation.estimator import estimate_from_header_bytes
 from estimation.presets import get_config_for_preset
-from exceptions import BadRequestError, FileTooLargeError
+from exceptions import BadRequestError, FileTooLargeError, SSRFError
 from routers.optimize import _read_upload_streaming
 from schemas import EstimateResponse, OptimizationConfig
 from utils.concurrency import estimate_gate
 from utils.format_detect import ImageFormat, detect_format
 from utils.image_validation import validate_image_dimensions
-from utils.url_fetch import _get_client, fetch_image, fetch_partial
+from utils.url_fetch import fetch_image, fetch_partial
 
 router = APIRouter()
 
@@ -212,28 +212,18 @@ async def estimate(
 async def _fetch_dimensions(url: str, is_authenticated: bool) -> tuple[int, int]:
     """Fetch just enough of the image to parse dimensions.
 
-    Downloads first 8KB via Range request, parses with Pillow.
-    Falls back to full download if Range not supported.
-    SSRF validation applied before any outbound request.
-    Reuses the lifespan-managed pooled httpx client to avoid per-call
-    TLS handshake overhead.
+    Reads at most the first 8KB via fetch_partial (SSRF check per redirect hop,
+    hard byte cap even when the origin ignores Range), parses with Pillow.
+    Falls back to fetch_image (32MB streaming cap) if the header can't be parsed.
     """
-    from PIL import Image
-
-    from security.ssrf import validate_url
-
-    validate_url(url)
-
     try:
-        client = await _get_client()
-        resp = await client.get(
-            url,
-            headers={"Range": "bytes=0-8191"},
-            timeout=httpx.Timeout(10),
+        partial, _ = await fetch_partial(
+            url, byte_range=(0, 8191), is_authenticated=is_authenticated
         )
-        partial = resp.content
         img = Image.open(io.BytesIO(partial))
         return img.size
+    except SSRFError:
+        raise
     except Exception:
         # Fallback: download full image just for dimensions
         data = await fetch_image(url, is_authenticated=is_authenticated)
