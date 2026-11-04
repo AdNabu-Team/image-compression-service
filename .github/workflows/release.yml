@@ -39,14 +39,14 @@ jobs:
 
       - name: Determine version bump
         id: next_version
+        env:
+          MSG: ${{ github.event.head_commit.message }}
         run: |
           TAG="${{ steps.latest_tag.outputs.tag }}"
           VERSION="${TAG#v}"
           MAJOR=$(echo "$VERSION" | cut -d. -f1)
           MINOR=$(echo "$VERSION" | cut -d. -f2)
           PATCH=$(echo "$VERSION" | cut -d. -f3)
-
-          MSG="${{ github.event.head_commit.message }}"
 
           if echo "$MSG" | grep -qi '\[major\]'; then
             MAJOR=$((MAJOR + 1))
