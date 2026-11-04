@@ -1,3 +1,5 @@
+import hmac
+
 from fastapi import Request
 
 from config import settings
@@ -34,7 +36,7 @@ def authenticate(request: Request) -> bool:
         # Local dev / tests: accept any bearer token
         return True
 
-    if provided_key != settings.api_key:
+    if not hmac.compare_digest(provided_key.encode(), settings.api_key.encode()):
         raise AuthenticationError("Invalid API key")
 
     return True

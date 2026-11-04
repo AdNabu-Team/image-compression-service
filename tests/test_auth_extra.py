@@ -74,3 +74,15 @@ def test_auth_no_api_key_configured_on_cloud_run_allows_public():
         mock_settings.api_key = ""
         mock_settings.k_service = "pare"
         assert authenticate(req) is False
+
+
+def test_auth_compares_key_in_constant_time():
+    """The key comparison goes through hmac.compare_digest."""
+    req = _make_request("Bearer secret-key-123")
+    with (
+        patch("security.auth.settings") as mock_settings,
+        patch("security.auth.hmac.compare_digest", return_value=True) as compare,
+    ):
+        mock_settings.api_key = "secret-key-123"
+        assert authenticate(req) is True
+    compare.assert_called_once_with(b"secret-key-123", b"secret-key-123")

@@ -350,7 +350,7 @@ async def test_lifespan_shutdown_closes_redis():
 
 
 def test_get_client_ip_forwarded_for():
-    """Cover middleware._get_client_ip parsing X-Forwarded-For header."""
+    """The rightmost X-Forwarded-For entry (appended by Cloud Run) is the client IP."""
     from middleware import _get_client_ip
 
     mock_request = MagicMock()
@@ -358,7 +358,7 @@ def test_get_client_ip_forwarded_for():
     mock_request.client.host = "127.0.0.1"
 
     ip = _get_client_ip(mock_request)
-    assert ip == "1.2.3.4"
+    assert ip == "9.10.11.12"
 
 
 def test_get_client_ip_single_forwarded():

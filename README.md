@@ -379,6 +379,7 @@ All settings via environment variables (see `config.py`):
 | `RATE_LIMIT_AUTH_ENABLED` | `false` | Enable rate limits for authenticated users |
 | `RATE_LIMIT_AUTH_RPM` | 0 | Authenticated requests per minute |
 | `ALLOWED_ORIGINS` | `"*"` | CORS allowed origins (comma-separated) |
+| `TRUSTED_PROXY_COUNT` | 1 | Proxies appending to `X-Forwarded-For` (Cloud Run = 1, +1 behind an external load balancer; 0 = use the socket peer) |
 | `URL_FETCH_TIMEOUT` | 30 | URL fetch timeout in seconds |
 | `URL_FETCH_MAX_REDIRECTS` | 5 | Maximum URL redirect hops |
 | `JPEG_ENCODER` | `"pillow"` | JPEG encoder: `"pillow"` or `"cjpeg"` (MozJPEG) |
@@ -395,7 +396,7 @@ All settings via environment variables (see `config.py`):
 
 ## Rate Limiting
 
-Redis-backed sliding window + burst limiting. Fail-open design (requests pass through if Redis is unavailable).
+Redis-backed sliding window + burst limiting, keyed by client IP: the `X-Forwarded-For` entry `TRUSTED_PROXY_COUNT` places from the right, since entries to its left are client-supplied. Fail-open design (requests pass through if Redis is unavailable).
 
 | Layer | Window | Default Limit | Applies To |
 |-------|--------|---------------|------------|
