@@ -353,5 +353,5 @@ async def test_gcs_upload_failure():
     uploader._client.bucket.side_effect = Exception("GCS error")
 
     config = StorageConfig(provider="gcs", bucket="test-bucket", path="test/path.png")
-    with pytest.raises(PareError, match="GCS upload failed"):
+    with pytest.raises(PareError, match="Storage upload failed"):
         await uploader.upload(b"data", "png", config)
