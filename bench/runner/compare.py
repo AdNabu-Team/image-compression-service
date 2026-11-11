@@ -12,9 +12,10 @@ iteration), Welch's t-test is meaningless (p is always 1.0, d is always
 regression iff |delta%| >= noise_floor_pct (default 25%). At n=2 the
 t-test engages with 1 degree of freedom — wide CI, but honest signal.
 
-The noise-floor gate is skipped entirely when the baseline median is
-below noise_floor_min_ms (default 5.0 ms): a 30% delta on a 0.5 ms
-case is measurement quantization, not signal.
+A case whose baseline median is below noise_floor_min_ms (default 5.0 ms)
+is never flagged, on either path: a 30% delta on a 0.5 ms case is
+measurement quantization, not signal, and its tight spread makes the
+t-test call it significant.
 
 Exit code semantics:
 
@@ -406,7 +407,7 @@ def compare(
             significant = differs_significantly(
                 a_walls, b_walls, alpha=alpha, min_effect_size=min_effect_size
             )
-            threshold_breach = abs(delta_pct) >= threshold_pct
+            threshold_breach = a_med >= noise_floor_min_ms and abs(delta_pct) >= threshold_pct
 
         diffs.append(
             CaseDiff(

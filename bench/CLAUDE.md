@@ -198,7 +198,7 @@ The 15 standard 8-bit JXL cases all succeed. Deep-color support is a separate de
 
 Three workflows gate optimizer / estimator changes:
 
-- `.github/workflows/bench-pr.yml` — automatic on `pull_request` events touching `optimizers/`, `estimation/`, `utils/`, `bench/`, `schemas.py`, `requirements*.txt`, `Dockerfile`, or the pinned baseline itself. Posts a sticky four-section comment on the PR (Timing / Compression / Estimation / Errors); fails CI on regression in any axis. Concurrency cancels in-flight runs on new pushes so only the latest commit's bench result is comment-visible.
+- `.github/workflows/bench-pr.yml` — automatic on `pull_request` events touching `optimizers/`, `estimation/`, `utils/`, `bench/`, `schemas.py`, `requirements*.txt`, `Dockerfile`, or the pinned baseline itself. Benchmarks the PR's base and head on the same runner, one after the other, and compares those two runs, not the pinned baseline: runner speed alone moved every case by up to ±30% against a baseline recorded on another machine. Posts a sticky four-section comment on the PR (Timing / Compression / Estimation / Errors); fails CI on regression in any axis. Concurrency cancels in-flight runs on new pushes so only the latest commit's bench result is comment-visible.
 - `.github/workflows/bench.yml` — `workflow_dispatch` (manual). Runs any mode you pick, posts a PR comment if the workflow runs on a branch with an open PR. Use for ad-hoc bench experiments (e.g. `--mode timing --repeat 5`) that the auto PR workflow doesn't cover.
 - `.github/workflows/bench-baseline-update.yml` — automatic on `push` to `main` touching the same paths as bench-pr.yml. Drift-detects and either auto-refreshes the baseline or opens a drift issue.
 
