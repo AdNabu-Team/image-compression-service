@@ -1,8 +1,10 @@
 name: Bench (PR)
 
 # Auto-runs on PRs that touch code paths capable of moving bench results.
-# Posts (or updates) a single sticky comment on the PR with the four-section
-# diff: Timing / Compression / Estimation / Errors. Hidden HTML signature
+# Benchmarks the PR's base and head on the same runner, one after the other, and
+# posts (or updates) a single sticky comment with the four-section diff:
+# Timing / Compression / Estimation / Errors. The pinned baseline was recorded on
+# another machine, and runner speed alone moved every case by up to ±30%. Hidden HTML signature
 # `<!-- pare-bench-comment -->` ensures repeat pushes update the same
 # comment rather than creating new ones. Job fails (red ❌) if compare
 # detects regressions in any axis.
@@ -35,12 +37,20 @@ jobs:
   bench:
     name: Bench PR
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 100
     steps:
       - name: Checkout PR head
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Checkout PR base
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+          persist-credentials: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -54,6 +64,33 @@ jobs:
           tags: pare:pr-${{ github.run_id }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Build base image (with layer cache)
+        uses: docker/build-push-action@v5
+        with:
+          context: base
+          file: base/Dockerfile
+          load: true
+          tags: pare:base-${{ github.run_id }}
+          cache-from: type=gha
+
+      - name: Build corpus + run accuracy mode on the base
+        # Same runner and shape as the head run below, so the comparison sees code changes, not runner speed.
+        run: |
+          mkdir -p base/reports base/tests/corpus base/bench/corpus/cache
+          docker run --rm -v "$(pwd)/base:/work" -w /work \
+            pare:base-${{ github.run_id }} \
+            bash -c "pip install --no-cache-dir -r requirements-bench.txt && \
+                     python -m bench.corpus build --manifest core && \
+                     python -m bench.run --mode accuracy --manifest core \
+                       --repeat 2 --warmup 0 \
+                       --annotate ci=github \
+                       --annotate kind=pr-base \
+                       --annotate pr=${{ github.event.pull_request.number }} \
+                       --annotate sha=${{ github.event.pull_request.base.sha }} \
+                       --out reports/_base.json"
+          sudo chown -R "$(id -u):$(id -g)" base
+          mkdir -p reports && cp base/reports/_base.json reports/_base.json
 
       - name: Build corpus + run accuracy mode in container
         # Same shape as bench-baseline-update.yml — accuracy mode is a superset
@@ -75,30 +112,17 @@ jobs:
                        --out reports/_head.json"
           sudo chown -R "$(id -u):$(id -g)" reports tests/corpus bench/corpus/cache
 
-      - name: Compare PR head against pinned baseline
+      - name: Compare PR head against its base
         id: compare
         run: |
-          BASELINE="reports/baseline.core.json"
-          if [ ! -f "$BASELINE" ]; then
-            echo "no-baseline=true" >> "$GITHUB_OUTPUT"
-            printf '_No baseline found at `%s`. This PR likely modifies the pinned baseline itself — uploading head report only._\n\n' "$BASELINE" > /tmp/compare.md
-            docker run --rm -v "$(pwd):/work" -w /work \
-              pare:pr-${{ github.run_id }} \
-              bash -c "pip install --no-cache-dir -q -r requirements-bench.txt && \
-                       python -m bench.run report reports/_head.json --format markdown" \
-              >> /tmp/compare.md
-            echo "compare-exit=0" >> "$GITHUB_OUTPUT"
-          else
-            echo "no-baseline=false" >> "$GITHUB_OUTPUT"
-            set +e
-            docker run --rm -v "$(pwd):/work" -w /work \
-              pare:pr-${{ github.run_id }} \
-              bash -c "pip install --no-cache-dir -q -r requirements-bench.txt && \
-                       python -m bench.compare \"$BASELINE\" reports/_head.json \
-                         --threshold-pct 10 --format markdown" > /tmp/compare.md
-            echo "compare-exit=$?" >> "$GITHUB_OUTPUT"
-            set -e
-          fi
+          set +e
+          docker run --rm -v "$(pwd):/work" -w /work \
+            pare:pr-${{ github.run_id }} \
+            bash -c "pip install --no-cache-dir -q -r requirements-bench.txt && \
+                     python -m bench.compare reports/_base.json reports/_head.json \
+                       --threshold-pct 10 --format markdown" > /tmp/compare.md
+          echo "compare-exit=$?" >> "$GITHUB_OUTPUT"
+          set -e
 
       - name: Compose bench comment
         run: |
@@ -107,7 +131,7 @@ jobs:
             echo ""
             echo "## Pare bench — PR #${{ github.event.pull_request.number }}"
             echo ""
-            echo "_Run: [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) · Commit: \`${{ github.event.pull_request.head.sha }}\` · Mode: \`accuracy\` / \`core\` · Threshold: \`±10%\`_"
+            echo "_Run: [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) · Base: \`${{ github.event.pull_request.base.sha }}\` · Head: \`${{ github.event.pull_request.head.sha }}\` · Same runner · Mode: \`accuracy\` / \`core\` · Threshold: \`±10%\`_"
             echo ""
             cat /tmp/compare.md
             echo ""
@@ -134,13 +158,15 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bench-pr-head-${{ github.run_id }}
-          path: reports/_head.json
+          name: bench-pr-${{ github.run_id }}
+          path: |
+            reports/_base.json
+            reports/_head.json
           retention-days: 14
           if-no-files-found: ignore
 
       - name: Fail if regression detected
-        if: steps.compare.outputs.no-baseline == 'false' && steps.compare.outputs.compare-exit != '0'
+        if: steps.compare.outputs.compare-exit != '0'
         run: |
           echo "::error::bench.compare detected regressions; see the PR comment for the per-axis breakdown."
           exit 1

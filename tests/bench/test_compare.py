@@ -173,6 +173,21 @@ def test_stats_significant_regression_5iter_30pct(tmp_path: Path):
     assert result.exit_code == 1
 
 
+def test_stats_sub_floor_case_is_never_a_regression(tmp_path: Path):
+    """A 0.4 ms case with a tight spread is significant at +10%, but below the 5 ms floor it is not flagged."""
+    a_iters = [_iter("img.bmp@low", 0.40 + i * 0.001, iteration=i) for i in range(5)]
+    b_iters = [_iter("img.bmp@low", 0.44 + i * 0.001, iteration=i) for i in range(5)]
+
+    result = compare(
+        _write(tmp_path, "a.json", a_iters), _write(tmp_path, "b.json", b_iters), threshold_pct=10.0
+    )
+
+    assert result.diffs[0].significant is True
+    assert result.diffs[0].threshold_breach is False
+    assert result.regressions == []
+    assert result.exit_code == 0
+
+
 def test_stats_below_threshold_5iter_5pct(tmp_path: Path):
     """5 iterations each with tight spread, +5% delta → below_threshold, exit 0."""
     a_iters = [_iter("img.png@high", 100.0 + i * 0.05, iteration=i) for i in range(5)]

@@ -51,7 +51,7 @@ python -m bench.run report reports/bench.json --format markdown
 # Refresh the pinned CI baseline (commit the result to trigger workflow comparison)
 python -m bench.run --mode quick --manifest core \
   --annotate "env=local-venv-bootstrap" --out reports/baseline.core.json
-# See .github/workflows/bench-pr.yml — PRs auto-compare against this baseline
+# main's drift check (bench-baseline-update.yml) compares against this baseline; PRs compare base and head on one runner
 
 # Build the bench dashboard locally (deploys to GitHub Pages on main push)
 python -m bench.dashboard.build --out-dir /tmp/dash
