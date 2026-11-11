@@ -27,6 +27,7 @@ Defined in `conftest.py`:
 - **`test_formats.py`**: All 12 formats, APNG detection, format-specific behavior
 - **`test_optimizer_jxl.py`**: JXL optimizer unit tests (skips if jxlpy not installed)
 - **`test_security.py`**: Auth (valid/invalid/missing tokens), rate limiting, SSRF blocking, SVG sanitization
+- **`test_route_auth.py`**: walks every route and fails if one other than `middleware.PUBLIC_PATHS` answers without a key
 - **`test_gcs.py`**: GCS upload (mocked)
 - **`test_logging.py`**: Structured JSON output validation
 

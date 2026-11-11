@@ -48,7 +48,7 @@ Bearer token via the `Authorization` header. Configure via the `API_KEY` environ
 Authorization: Bearer <your-api-key>
 ```
 
-Requests without an `Authorization` header are public and rate-limited; storage uploads (below) require a valid key. When `API_KEY` is empty (default), the service runs in dev mode and accepts any bearer token, except on Cloud Run (`K_SERVICE` set), where it rejects every bearer token, so set `API_KEY` there.
+Every request needs a valid key, except `GET /health` and CORS preflights; anything else gets 401. On Cloud Run (`K_SERVICE` set) an empty `API_KEY` rejects every request, so set it there. Locally with `API_KEY` empty (default) the service runs in dev mode: it accepts any bearer token and requests without one, but storage uploads (below) still need a bearer token.
 
 ### Error Responses
 
@@ -372,10 +372,10 @@ All settings via environment variables (see `config.py`):
 | `MAX_FILE_SIZE_MB` | 32 | Upload size limit in MB |
 | `DEFAULT_QUALITY` | 80 | Default quality when not specified (1-100) |
 | `TOOL_TIMEOUT_SECONDS` | 60 | Per-tool compression timeout |
-| `API_KEY` | `""` | Bearer token (empty = dev mode; on Cloud Run, empty rejects all bearer tokens) |
+| `API_KEY` | `""` | Bearer token every request needs (empty = dev mode locally; on Cloud Run, empty rejects every request) |
 | `REDIS_URL` | `""` | Redis URL for rate limiting (empty = disabled) |
-| `RATE_LIMIT_PUBLIC_RPM` | 60 | Public requests per minute (0 = unlimited) |
-| `RATE_LIMIT_PUBLIC_BURST` | 10 | Public requests per 10s burst (0 = unlimited) |
+| `RATE_LIMIT_PUBLIC_RPM` | 60 | Keyless requests per minute, local dev only (0 = unlimited) |
+| `RATE_LIMIT_PUBLIC_BURST` | 10 | Requests per 10s burst, every caller (0 = unlimited) |
 | `RATE_LIMIT_AUTH_ENABLED` | `false` | Enable rate limits for authenticated users |
 | `RATE_LIMIT_AUTH_RPM` | 0 | Authenticated requests per minute |
 | `ALLOWED_ORIGINS` | `"*"` | CORS allowed origins (comma-separated) |
@@ -400,8 +400,8 @@ Redis-backed sliding window + burst limiting, keyed by client IP: the `X-Forward
 
 | Layer | Window | Default Limit | Applies To |
 |-------|--------|---------------|------------|
-| Per-minute | 60 seconds (sliding) | 60 req/min | Public (unauthenticated) requests |
-| Burst | 10 seconds | 10 req/10s | Public (unauthenticated) requests |
+| Per-minute | 60 seconds (sliding) | 60 req/min | Keyless requests (local dev only; deployed, they get 401) |
+| Burst | 10 seconds | 10 req/10s | Every request |
 
 Authenticated requests are not rate-limited by default (`RATE_LIMIT_AUTH_ENABLED=false`).
 
