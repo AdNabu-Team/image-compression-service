@@ -13,16 +13,20 @@ def authenticate(request: Request) -> bool:
         request: FastAPI request object.
 
     Returns:
-        True if authenticated, False if no auth header present.
+        True if authenticated, False for a request without a key in local dev
+        (no `API_KEY` and not on Cloud Run).
 
     Raises:
-        AuthenticationError: If auth header present but key is invalid, or if
-            no API key is configured on Cloud Run (fail closed).
+        AuthenticationError: If the key is missing or invalid. Deployed (Cloud Run)
+            or with `API_KEY` set, every request needs a valid key; without
+            `API_KEY` on Cloud Run no key is valid (fail closed).
     """
     auth_header = request.headers.get("Authorization", "")
 
     if not auth_header:
-        return False  # No auth — treated as public request
+        if settings.api_key or settings.k_service:
+            raise AuthenticationError("A valid API key is required")
+        return False  # Local dev without API_KEY
 
     if not auth_header.startswith("Bearer "):
         raise AuthenticationError("Invalid Authorization header format. Expected: Bearer <key>")

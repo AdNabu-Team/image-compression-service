@@ -225,7 +225,7 @@ class MockRequest:
 
 
 def test_auth_no_header():
-    """No auth header -> public (False, not error)."""
+    """No auth header in local dev (no API_KEY, not on Cloud Run) -> False, not an error."""
     req = MockRequest({})
     result = authenticate(req)
     assert result is False

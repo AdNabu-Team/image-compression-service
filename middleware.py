@@ -10,6 +10,16 @@ from exceptions import PareError
 from security.auth import authenticate
 from security.rate_limiter import safe_check_rate_limit
 
+# Paths served without an API key: uptime checks only. Anything added here is open to the internet.
+PUBLIC_PATHS = frozenset({"/health"})
+
+
+def is_public_request(request: Request) -> bool:
+    """Whether the request skips authentication: a public path, or a CORS preflight (which carries no key)."""
+    if request.url.path in PUBLIC_PATHS:
+        return True
+    return request.method == "OPTIONS" and "access-control-request-method" in request.headers
+
 
 class SecurityMiddleware(BaseHTTPMiddleware):
     """Combined middleware for auth, rate limiting, and request ID.
@@ -29,7 +39,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
 
         try:
             # 2. Authentication
-            is_authenticated = authenticate(request)
+            is_authenticated = False if is_public_request(request) else authenticate(request)
             request.state.is_authenticated = is_authenticated
 
             # 3. Rate limiting

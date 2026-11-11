@@ -19,9 +19,12 @@ def _make_request(auth_header=None):
 
 
 def test_auth_no_header():
-    """No auth header -> returns False (public request)."""
+    """No auth header in local dev (no API_KEY, not on Cloud Run) -> returns False."""
     req = _make_request()
-    assert authenticate(req) is False
+    with patch("security.auth.settings") as mock_settings:
+        mock_settings.api_key = ""
+        mock_settings.k_service = ""
+        assert authenticate(req) is False
 
 
 def test_auth_malformed_header():
@@ -67,13 +70,24 @@ def test_auth_no_api_key_configured_on_cloud_run_fails_closed():
             authenticate(req)
 
 
-def test_auth_no_api_key_configured_on_cloud_run_allows_public():
-    """No API_KEY on Cloud Run -> requests without a header stay public."""
+def test_auth_no_header_on_cloud_run_is_rejected():
+    """On Cloud Run a request without a key is refused, even with no API_KEY configured."""
     req = _make_request()
     with patch("security.auth.settings") as mock_settings:
         mock_settings.api_key = ""
         mock_settings.k_service = "pare"
-        assert authenticate(req) is False
+        with pytest.raises(AuthenticationError):
+            authenticate(req)
+
+
+def test_auth_no_header_with_api_key_is_rejected():
+    """With API_KEY set, a request without a key is refused, on Cloud Run or not."""
+    req = _make_request()
+    with patch("security.auth.settings") as mock_settings:
+        mock_settings.api_key = "secret-key-123"
+        mock_settings.k_service = ""
+        with pytest.raises(AuthenticationError):
+            authenticate(req)
 
 
 def test_auth_compares_key_in_constant_time():
