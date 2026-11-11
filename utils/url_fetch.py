@@ -1,11 +1,12 @@
 import asyncio
 import logging
 
+import httpcore
 import httpx
 
 from config import settings
 from exceptions import FileTooLargeError, URLFetchError
-from security.ssrf import validate_url
+from security.ssrf import CheckedAddressBackend, validate_url
 
 logger = logging.getLogger("pare.utils.url_fetch")
 
@@ -22,6 +23,21 @@ _client_lock = asyncio.Lock()
 _IMAGE_ACCEPT_HEADER = "image/avif,image/webp,image/apng,image/svg+xml,image/*;q=0.8,*/*;q=0.5"
 
 
+class CheckedAddressTransport(httpx.AsyncHTTPTransport):
+    """httpx's transport, with a pool that connects through CheckedAddressBackend."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        limits = httpx.Limits()
+        self._pool = httpcore.AsyncConnectionPool(
+            ssl_context=httpx.create_ssl_context(),
+            max_connections=limits.max_connections,
+            max_keepalive_connections=limits.max_keepalive_connections,
+            keepalive_expiry=limits.keepalive_expiry,
+            network_backend=CheckedAddressBackend(),
+        )
+
+
 async def _get_client() -> httpx.AsyncClient:
     """Return the shared AsyncClient, creating it on first call."""
     global _client
@@ -33,7 +49,8 @@ async def _get_client() -> httpx.AsyncClient:
                     # so the client-level timeout is a wide backstop only.
                     timeout=httpx.Timeout(settings.url_fetch_timeout * 4),
                     follow_redirects=False,
-                    verify=True,
+                    transport=CheckedAddressTransport(),
+                    trust_env=False,
                 )
     return _client
 

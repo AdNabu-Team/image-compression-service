@@ -389,7 +389,7 @@ All settings via environment variables (see `config.py`):
 
 ## Security
 
-- **SSRF protection**: All URL fetches resolve the hostname and refuse any address that is not globally routable unicast (private, loopback, link-local, CGNAT, reserved, multicast, and IPv4-mapped or NAT64 forms of those) plus cloud metadata hostnames, at every redirect hop
+- **SSRF protection**: All URL fetches resolve the hostname and refuse any address that is not globally routable unicast (private, loopback, link-local, CGNAT, reserved, multicast, and IPv4-mapped or NAT64 forms of those) plus cloud metadata hostnames, at every redirect hop. The connection goes to the address that was checked, so a name that resolves differently at connect time (DNS rebinding) can't reach an internal one
 - **SVG sanitization**: Strips scripts, event handlers, and `foreignObject` elements
 - **Format detection**: Based on magic bytes, never file extension or Content-Type header
 - **Backpressure**: Semaphore-bounded concurrency with queue depth cap — returns 503 immediately when full to prevent OOM

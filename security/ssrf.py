@@ -1,7 +1,11 @@
 import ipaddress
 import logging
 import socket
+import typing
 from urllib.parse import urlparse
+
+import anyio
+import httpcore
 
 from exceptions import SSRFError
 
@@ -66,9 +70,8 @@ def validate_url(url: str) -> str:
             url=url,
         )
 
-    # 3. DNS resolution. The HTTP client resolves again when it connects, so
-    # this does not stop DNS rebinding; it blocks names that resolve to
-    # internal addresses at check time.
+    # 3. DNS resolution. An early refusal only: CheckedAddressBackend checks
+    # the addresses again when it connects, and connects only to those.
     try:
         addr_infos = socket.getaddrinfo(hostname, None)
     except socket.gaierror:
@@ -86,3 +89,47 @@ def validate_url(url: str) -> str:
             )
 
     return url
+
+
+class CheckedAddressBackend(httpcore.AnyIOBackend):
+    """Network backend that connects only to addresses `is_blocked_ip` allows.
+
+    The host is resolved once here, every address is checked, and the socket
+    is opened to a checked address, so a name that resolves differently when
+    the client connects (DNS rebinding) can't reach an internal one. TLS
+    still verifies, and sends SNI for, the hostname, and the pool stays keyed
+    by hostname.
+    """
+
+    async def connect_tcp(
+        self,
+        host: str,
+        port: int,
+        timeout: float | None = None,
+        local_address: str | None = None,
+        socket_options: typing.Iterable[httpcore.SOCKET_OPTION] | None = None,
+    ) -> httpcore.AsyncNetworkStream:
+        """Resolve host, refuse it if any address is blocked, then connect to the first that answers."""
+        try:
+            with anyio.fail_after(timeout):
+                addr_infos = await anyio.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+        except TimeoutError as exc:
+            raise httpcore.ConnectTimeout(f"Resolving {host} timed out") from exc
+        except OSError as exc:
+            raise httpcore.ConnectError(f"Could not resolve {host}") from exc
+
+        addresses = list(dict.fromkeys(sockaddr[0] for *_, sockaddr in addr_infos))
+        for address in addresses:
+            if is_blocked_ip(ipaddress.ip_address(address)):
+                logger.warning("ssrf_blocked_at_connect host=%s ip=%s", host, address)
+                raise SSRFError("URL resolves to a private/reserved IP address", url=host)
+
+        last_error: Exception = httpcore.ConnectError(f"No address for {host}")
+        for address in addresses:
+            try:
+                return await super().connect_tcp(
+                    address, port, timeout, local_address, socket_options
+                )
+            except (httpcore.ConnectError, httpcore.ConnectTimeout) as exc:
+                last_error = exc
+        raise last_error
